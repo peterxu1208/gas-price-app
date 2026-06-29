@@ -3,27 +3,27 @@
    ------------------------------------------------------------
    The SINGLE boundary between the app and the outside world.
    Every network / provider call lives here behind a small async
-   interface, so swapping the current keyless OpenStreetMap backend
-   for Google APIs is a change to THIS FILE ONLY — the UI and logic
-   in app.js never need to know which backend is live.
+   interface, so the rest of the app never knows which backend is live.
 
-   Current backend (keyless, CORS-friendly, works from file://):
-     • getHomeStations()  → sample data from data.js (window.FuelData)
-     • geocode()          → OpenStreetMap Nominatim
-     • findStationsNear() → OpenStreetMap Overpass (amenity=fuel)
+   Backend: Google APIs via a same-origin serverless proxy (so the API key
+   stays server-side — see api/geocode.js and api/stations.js). Because the
+   proxy is same-origin (app + /api on one Vercel domain) there's no CORS to
+   manage; fetch('/api/...') just works.
+     • getHomeStations()  → /api/stations around HOME  (Places searchNearby + fuelOptions)
+     • geocode()          → /api/geocode              (Geocoding API)
+     • findStationsNear() → /api/stations             (Places searchNearby + fuelOptions)
 
-   GOING LIVE WITH GOOGLE — each function below has a TODO(google)
-   marking exactly what to replace. The returned shapes already match
-   DATA-SHAPE.md / Google's fuelOptions, so callers don't change:
-     • getHomeStations  → fetch('/api/prices') from your proxy
-     • geocode          → Geocoding API (via proxy)
-     • findStationsNear → Places API (New) searchNearby + fuelOptions (via proxy)
+   Returned shapes match DATA-SHAPE.md, so app.js / the UI need no changes.
+   Domain helpers (the brand classifier and the distance function) are injected
+   by app.js via configure(), keeping the brand registry and its colors in the
+   UI layer; brand + distance are applied here in toStation().
 
-   Loaded as a plain <script> AFTER data.js, BEFORE app.js (no build
-   step, no ES modules — still opens via file://). Exposes
-   window.FuelServices. Domain helpers (the brand classifier and the
-   distance function) are injected by app.js via configure(), keeping
-   the brand registry and its colors in the UI layer where they belong.
+   LOCAL DEV: opened via file:// or a plain static server, /api doesn't exist,
+   so getHomeStations() falls back to the sample fixture (data.js) and search
+   surfaces a toast. Run `vercel dev` (or use the deployed URL) for live data.
+
+   Loaded as a plain <script> AFTER data.js, BEFORE app.js (no build step, no ES
+   modules). Exposes window.FuelServices.
    ============================================================ */
 (function () {
   'use strict';
@@ -37,66 +37,54 @@
     if (opts && opts.distMi)   _distMi = opts.distMi;
   }
 
-  /* ---- HOME STATIONS (with prices) ----
-     TODO(google): replace the body with
-       const r = await fetch('/api/prices'); return r.json();
-     keeping the DATA-SHAPE.md shape. */
-  async function getHomeStations() {
-    return FD.getStationData();
-  }
-
-  /* ---- GEOCODE: query string → { lat, lng, label, full } | null ----
-     TODO(google): swap Nominatim for the Geocoding API (through your proxy
-     so the key stays server-side). Map the response to the same
-     { lat, lng, label, full } shape and nothing else changes. */
-  function shortLabel(g) {
-    const a = g.address || {};
-    const primary = a.road || a.neighbourhood || a.suburb || a.hamlet || a.village || a.town || a.city || a.county || g.name;
-    const city = a.city || a.town || a.village || a.county;
-    if (primary && city && primary !== city) return `${primary}, ${city}`;
-    return primary || (g.display_name || '').split(',').slice(0, 2).join(',').trim();
-  }
-  async function geocode(q) {
-    const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=1&q=' + encodeURIComponent(q);
-    const r = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (!r.ok) throw new Error('geocode http ' + r.status);
-    const j = await r.json();
-    if (!j.length) return null;
-    const g = j[0];
-    return { lat: +g.lat, lng: +g.lon, label: shortLabel(g), full: g.display_name };
-  }
-
-  /* ---- NEARBY STATIONS: (lat,lng) → [station, …] sorted by distance ----
-     Searched stations have no keyless price source, so fuelPrices is [] and
-     they render in the honest "no data" state.
-     TODO(google): swap Overpass for Places API (New) searchNearby with the
-     fuelOptions field mask (through your proxy). Map each result to the shape
-     below — set fuelPrices from fuelOptions.fuelPrices — and the rest is unchanged. */
-  function osmToStation(el, oLat, oLng) {
-    const lat = el.lat != null ? el.lat : el.center && el.center.lat;
-    const lng = el.lon != null ? el.lon : el.center && el.center.lon;
-    if (lat == null || lng == null) return null;
-    const t = el.tags || {};
-    let openNow = null;
-    if (t.opening_hours && t.opening_hours.trim() === '24/7') openNow = true;   // anything fancier is left unknown
+  /* Map a raw proxy station (Google-derived) into the canonical app shape.
+     Brand + distance are applied here so the brand registry stays in app.js. */
+  function toStation(raw, oLat, oLng) {
     return {
-      id: `osm-${el.type}-${el.id}`,
-      brand: _classify(t),
-      name: t.name || t.brand || t.operator || 'Gas station',
-      lat, lng,
-      distanceMi: _distMi(oLat, oLng, lat, lng),
-      openNow,
-      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
-      fuelPrices: [],   // no keyless price source — fills in once a Google proxy is added
+      id: raw.id || `g-${raw.lat},${raw.lng}`,
+      brand: _classify({ name: raw.name }),
+      name: raw.name || 'Gas station',
+      lat: raw.lat,
+      lng: raw.lng,
+      distanceMi: _distMi(oLat, oLng, raw.lat, raw.lng),
+      openNow: raw.openNow == null ? null : raw.openNow,
+      mapsUrl: raw.id
+        ? `https://www.google.com/maps/search/?api=1&query=${raw.lat},${raw.lng}&query_place_id=${raw.id}`
+        : `https://www.google.com/maps/search/?api=1&query=${raw.lat},${raw.lng}`,
+      fuelPrices: Array.isArray(raw.fuelPrices) ? raw.fuelPrices : [],
     };
   }
+
+  async function fetchNear(lat, lng, radiusM) {
+    const r = await fetch(`/api/stations?lat=${lat}&lng=${lng}&radius=${radiusM}`);
+    if (!r.ok) throw new Error('stations http ' + r.status);
+    const raw = await r.json();
+    return raw.map(s => toStation(s, lat, lng)).sort((a, b) => a.distanceMi - b.distanceMi);
+  }
+
+  /* ---- HOME STATIONS (with live prices) ---- */
+  async function getHomeStations() {
+    try {
+      return await fetchNear(FD.HOME.lat, FD.HOME.lng, 4000);
+    } catch (e) {
+      // No proxy reachable (file:// or static-only dev). Fall back to the sample
+      // fixture so the app still renders. NOTE: these are SAMPLE prices, not live
+      // — deploy the proxy (or run `vercel dev`) for real data.
+      console.warn('[services] live home stations unavailable, using sample data:', e.message);
+      return FD.getStationData();
+    }
+  }
+
+  /* ---- GEOCODE: query string → { lat, lng, label, full } | null ---- */
+  async function geocode(q) {
+    const r = await fetch('/api/geocode?q=' + encodeURIComponent(q));
+    if (!r.ok) throw new Error('geocode http ' + r.status);
+    return r.json();   // { lat, lng, label, full } or null
+  }
+
+  /* ---- NEARBY STATIONS: (lat,lng) → [station, …] sorted by distance ---- */
   async function findStationsNear(lat, lng, radiusM = 4000) {
-    const q = `[out:json][timeout:25];(node["amenity"="fuel"](around:${radiusM},${lat},${lng});way["amenity"="fuel"](around:${radiusM},${lat},${lng}););out center tags;`;
-    const r = await fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(q));
-    if (!r.ok) throw new Error('overpass http ' + r.status);
-    const j = await r.json();
-    return (j.elements || []).map(el => osmToStation(el, lat, lng)).filter(Boolean)
-      .sort((a, b) => a.distanceMi - b.distanceMi);
+    return fetchNear(lat, lng, radiusM);
   }
 
   window.FuelServices = { configure, getHomeStations, geocode, findStationsNear };

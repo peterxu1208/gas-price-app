@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Hope Ave Fuel — Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="map"></div>
+<div id="edgeIndicators"></div>
+<button class="locate-btn" id="locateBtn" title="Back to home" aria-label="Back to home">
+  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2L4.5 20l7.5-4.2L19.5 20z"/></svg>
+</button>
+
+<div class="topbar">
+  <div class="topcard">
+    <form class="trow searchrow" id="searchForm" autocomplete="off" role="search">
+      <svg class="search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="searchInput" type="text" placeholder="Search a location…" aria-label="Search a location" enterkeyhint="search">
+      <button type="button" id="searchClear" class="search-clear" title="Back to home" aria-label="Back to home" hidden>✕</button>
+    </form>
+    <div class="trow toprow">
+      <div class="ttl">
+        <h1 id="locName">Hope Ave</h1>
+      </div>
+      <span class="stamp"><span class="live-dot"></span><span id="syncStamp">checking data…</span></span>
+    </div>
+    <div class="trow">
+      <div class="seg" id="gradeSeg">
+        <button data-grade="REGULAR_UNLEADED">Reg</button>
+        <button data-grade="MIDGRADE">Mid</button>
+        <button class="on" data-grade="PREMIUM">Prem</button>
+      </div>
+    </div>
+    <div class="trow brandrow">
+      <div class="brandfilter" id="brandFilter"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Leaflet (CDN), then data.js (sample-data fixture), then services.js (the single
+     external-data boundary — swap seam for Google APIs), then app.js (UI + logic).
+     Plain <script> tags + relative paths: no build step, opens directly via file://. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="data.js"></script>
+<script src="services.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+:root{
+  --bg:#f4f3ef;--panel:#ffffff;--line:#e6e3dc;--line-bright:#d4cfc5;
+  --txt:#1a1c20;--muted:#6f747d;--muted-2:#a3a8b0;
+  --fresh:#0f9b54;--aging:#b9760a;--stale:#d23b3b;--nodata:#9aa0a8;
+  --shell:#e0b000;--mobil:#2563eb;
+  --map-bg:#eceae3;--road:#d7d2c7;--road-major:#cbc5b8;--hwy:#ecd9a6;--hwy-edge:#dcc285;--river:#bcd6e8;
+  --shadow:0 8px 24px rgba(40,42,48,.14);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins',sans-serif;overflow:hidden}
+.mono{font-family:'Poppins',sans-serif;font-variant-numeric:tabular-nums}
+#map{position:absolute;inset:0;background:var(--map-bg)}
+/* when the OSM fallback style is active, nudge it toward Google's lighter palette */
+#map.gmaps-soften .leaflet-tile{filter:saturate(.82) brightness(1.04) contrast(.96)}
+.leaflet-container{background:var(--map-bg);font-family:'Poppins',sans-serif}
+.leaflet-control-attribution{background:rgba(255,255,255,.7)!important;color:var(--muted-2)!important;font-size:9px!important}
+.leaflet-control-zoom{border:1px solid var(--line-bright)!important;margin:14px!important;box-shadow:var(--shadow)!important}
+.leaflet-control-zoom a{background:#fff!important;color:var(--txt)!important;border-color:var(--line)!important}
+.leaflet-control-zoom a:hover{background:#f7f6f2!important;color:var(--fresh)!important}
+
+.locate-btn{position:absolute;right:14px;bottom:14px;z-index:1000;width:42px;height:42px;border-radius:50%;
+  background:#fff;border:1px solid var(--line-bright);box-shadow:var(--shadow);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;color:var(--txt)}
+.locate-btn:hover{color:var(--fresh);border-color:var(--fresh)}
+.locate-btn:active{transform:scale(.94)}
+.locate-btn svg{width:20px;height:20px}
+
+/* ---------- off-screen station indicators ---------- */
+#edgeIndicators{position:absolute;inset:0;z-index:999;pointer-events:none}
+.edge-chip{position:absolute;pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:5px;
+  background:#fff;border:1.5px solid var(--brand,var(--line-bright));border-radius:20px;padding:5px 9px 5px 7px;
+  font-family:'Poppins',sans-serif;font-weight:700;font-size:11px;color:var(--txt);
+  box-shadow:0 5px 14px rgba(40,42,48,.22);white-space:nowrap;transition:transform .15s}
+.edge-chip:hover{transform:scale(1.06)}
+.edge-chip .arrow{width:13px;height:13px;flex:none;color:var(--muted)}
+.edge-chip.best{border-color:var(--fresh);color:#0b7a41}
+.edge-chip.best .arrow{color:var(--fresh)}
+
+/* map text labels */
+.maplabel{font-family:'Poppins',sans-serif;font-size:8.5px;letter-spacing:.13em;color:var(--muted-2);
+  text-transform:uppercase;white-space:nowrap;text-shadow:0 1px 2px rgba(255,255,255,.85),0 0 3px rgba(255,255,255,.9);pointer-events:none}
+.maplabel.river{color:#7fa6c4}
+.ishield{font-family:'Poppins',sans-serif;font-size:8px;font-weight:700;color:#8a7430;background:#f6e6bd;border:1px solid var(--hwy-edge);
+  border-radius:4px;padding:1px 5px;letter-spacing:.05em;pointer-events:none}
+.mapbadge{position:absolute;left:50%;bottom:172px;transform:translateX(-50%);z-index:1001;
+  background:rgba(255,255,255,.93);border:1px solid var(--line-bright);border-radius:9px;padding:7px 12px;
+  font-family:'Poppins',sans-serif;font-size:9px;letter-spacing:.03em;color:var(--muted);
+  box-shadow:var(--shadow);max-width:88%;text-align:center;line-height:1.55}
+
+/* ---------- floating header ---------- */
+.topbar{position:absolute;top:0;left:0;z-index:1000;padding:14px;pointer-events:none;display:inline-block;max-width:calc(100% - 28px)}
+.topcard{pointer-events:auto;background:rgba(255,255,255,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--line-bright);border-radius:15px;padding:11px 13px;box-shadow:var(--shadow);
+  display:flex;flex-direction:column;gap:9px;width:300px;max-width:100%}
+
+/* ---------- location search ---------- */
+.searchrow{overflow:visible;gap:8px;background:#efece5;border:1px solid var(--line);border-radius:9px;padding:0 8px;height:34px}
+.searchrow.busy{opacity:.7}
+.search-ic{width:14px;height:14px;flex:none;color:var(--muted-2)}
+#searchInput{flex:1 1 auto;min-width:0;height:100%;border:0;background:transparent;outline:none;
+  font-family:'Poppins',sans-serif;font-size:11px;color:var(--txt)}
+#searchInput::placeholder{color:var(--muted-2)}
+#searchInput:disabled{cursor:progress}
+.search-clear{flex:none;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;line-height:1;
+  padding:3px 4px;border-radius:6px;transition:.14s}
+.search-clear:hover{color:var(--txt);background:rgba(0,0,0,.06)}
+.trow{display:flex;align-items:center;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.trow::-webkit-scrollbar{display:none}
+.trow.toprow{gap:12px;padding-bottom:7px;border-bottom:1px solid var(--line);justify-content:space-between;align-items:flex-start;overflow:visible}
+.ttl{flex:1 1 auto;min-width:0}
+.ttl h1{font-size:17px;font-weight:800;letter-spacing:-.02em;line-height:1.12;
+  overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.stamp{margin-top:2px}
+.stamp{display:flex;align-items:center;gap:6px;font-family:'Poppins',sans-serif;font-size:9.5px;color:var(--muted);white-space:nowrap;flex:0 0 auto}
+.live-dot{--dot:var(--fresh);width:6px;height:6px;border-radius:50%;background:var(--dot);animation:pulse 2.4s infinite}
+/* --dot is set per data-freshness in JS; halo derives from it (color-mix; degrades to no halo if unsupported) */
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--dot) 40%,transparent)}70%{box-shadow:0 0 0 6px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+.seg{display:flex;align-items:center;background:#efece5;border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px;height:32px;box-sizing:border-box}
+#gradeSeg{width:100%}
+#gradeSeg button{flex:1 1 0;justify-content:center}
+.seg button{font-family:'Poppins',sans-serif;font-size:9.5px;font-weight:600;line-height:1;color:var(--muted);background:transparent;border:0;border-radius:6px;
+  height:100%;box-sizing:border-box;
+  padding:0 7.5px;cursor:pointer;transition:.14s;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.seg button:hover{color:var(--txt)}
+.seg button.on{background:#fff;color:var(--txt);box-shadow:0 1px 3px rgba(40,42,48,.12),inset 0 0 0 1px var(--line-bright)}
+.bcnt{font-weight:500;color:var(--muted-2);font-variant-numeric:tabular-nums}
+.bchk.on .bcnt{color:var(--muted)}
+
+/* ---------- custom tooltip (Other brand breakdown) ---------- */
+.brand-tip{position:fixed;z-index:99999;background:#fff;border:1px solid var(--line-bright);border-radius:10px;
+  padding:8px 11px;box-shadow:0 6px 18px rgba(40,42,48,.18);pointer-events:none;opacity:0;transform:translateY(4px);
+  transition:opacity .12s ease,transform .12s ease;font-family:'Poppins',sans-serif;font-size:11.5px;font-weight:500;
+  color:var(--txt);white-space:nowrap;min-width:120px}
+.brand-tip.visible{opacity:1;transform:translateY(0)}
+.bt-row{padding:2px 0;color:var(--muted)}
+.bt-row:first-child{padding-top:0}.bt-row:last-child{padding-bottom:0}
+
+/* ---------- brand filter (multi-select checkbox chips, built dynamically) ---------- */
+.brandrow{overflow:visible;margin-top:6px}
+.brandfilter{display:flex;flex-wrap:wrap;gap:6px;width:100%}
+.bchk{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;cursor:pointer;user-select:none;
+  background:#efece5;border:1px solid var(--line);font-family:'Poppins',sans-serif;font-size:9.5px;color:var(--muted);transition:.14s}
+.bchk:hover{color:var(--txt)}
+.bchk.on{background:#fff;color:var(--txt);box-shadow:0 1px 3px rgba(40,42,48,.12),inset 0 0 0 1px var(--line-bright)}
+.bchk input{margin:0;width:12px;height:12px;flex:none;accent-color:var(--fresh);cursor:pointer}
+.bchk-all{position:relative;margin-right:7px}                 /* master select-all/none toggle */
+.bchk-all::after{content:"";position:absolute;right:-5px;top:6px;bottom:6px;width:1px;background:var(--line)}
+.bdot{width:8px;height:8px;border-radius:50%;flex:none}
+.bnm{font-weight:600;white-space:nowrap}
+.bi{width:14px;height:14px;flex:none;object-fit:contain;display:block}
+.bdg{width:15px;height:15px;flex:none;object-fit:contain;display:inline-block}
+
+/* ---------- price-tag markers ---------- */
+/* Leaflet sizes each marker icon to its full iconSize box, and .pin (block-level
+   flex) stretches to that full width too — so the transparent strips around the
+   visible chip still capture the mouse, making adjacent pins' hit boxes overlap
+   and flicker. Pass events through both the box and .pin, and re-enable them only
+   on the visible chip (.ptag). Events still bubble to Leaflet's marker listener,
+   and :hover still applies to .pin because its descendant is the pointer target. */
+.leaflet-marker-icon{pointer-events:none!important}
+.pin{position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;pointer-events:none;
+  transition:transform .13s cubic-bezier(.22,1,.36,1), opacity .13s cubic-bezier(.22,1,.36,1)}
+.pin .ptag,.pin .crown{pointer-events:auto}
+/* ROOT-CAUSE RULE: hover must NOT change the hit target's geometry. Any
+   transform that moves/resizes the chip can push it out from under the cursor,
+   firing a spurious mouseleave that closes the popup → the chip returns → re-enter
+   → flicker (and the cursor icon toggles pointer/default). So the hover affordance
+   is a box-shadow only (no layout/hit-testing change); z-index is geometry-safe. */
+.pin:hover{z-index:9999}
+.pin:hover .ptag{box-shadow:0 9px 24px rgba(40,42,48,.32)}
+/* filter-change crossfade: opacity + scale/translate only (GPU-composited, no
+   blur) for a smooth settle; per-pin stagger is set inline in drawMarkers(). */
+.pin.fade-in{opacity:0;transform:translateY(7px) scale(.9)}
+.pin.fade-in.show{opacity:1;transform:translateY(0) scale(1)}
+.ptag{display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:#fff;border:1.5px solid var(--brand,var(--line-bright));
+  border-radius:9px;padding:8px 9px 5px;font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;color:var(--txt);
+  box-shadow:0 5px 14px rgba(40,42,48,.22);white-space:nowrap;transition:box-shadow .14s ease}
+.ptag-nm{font-size:9px;font-weight:600;letter-spacing:.03em;color:var(--muted-2);line-height:1;text-transform:uppercase}
+.ptag-price{display:flex;align-items:center;gap:5px;line-height:1}
+.ptag .fdot{width:6px;height:6px;border-radius:50%;flex:none}
+.ptag.nodata{color:var(--nodata);border-color:var(--line);border-style:dashed;background:#faf9f6}
+.pin .stem{width:2px;height:8px;background:var(--brand,var(--line-bright))}
+.pin .base{width:7px;height:7px;border-radius:50%;background:var(--brand,var(--line-bright));margin-top:-2px}
+.pin.best .ptag{background:linear-gradient(150deg,#e9f9f0,#ddf4e8);border-color:var(--fresh);color:#0b7a41;
+  font-size:15px;padding:7px 11px;box-shadow:0 0 0 3px rgba(15,155,84,.16),0 10px 22px rgba(40,80,60,.22)}
+.pin.best{z-index:9000}
+.crown{position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-family:'Poppins',sans-serif;font-size:8px;
+  letter-spacing:.12em;color:#fff;background:var(--fresh);padding:2px 6px;border-radius:20px;font-weight:700;white-space:nowrap;box-shadow:0 3px 8px rgba(15,155,84,.3)}
+.homepin{display:flex;flex-direction:column;align-items:center}
+.homepin .h{width:30px;height:30px;border-radius:50% 50% 50% 4px;transform:rotate(45deg);
+  background:linear-gradient(145deg,#ffffff,#eceae3);border:1.5px solid var(--muted);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(40,42,48,.22)}
+.homepin .h svg{transform:rotate(-45deg);width:14px;height:14px;color:var(--txt)}
+.homepin .lbl,.locpin .lbl{margin-top:5px;font-family:'Poppins',sans-serif;font-size:8.5px;letter-spacing:.14em;color:var(--muted);
+  background:rgba(255,255,255,.85);padding:2px 6px;border-radius:5px;box-shadow:0 2px 6px rgba(40,42,48,.12);
+  max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* searched-location pin (teardrop, accent-colored) */
+.locpin{display:flex;flex-direction:column;align-items:center}
+.locpin .h{width:28px;height:28px;border-radius:50% 50% 50% 4px;transform:rotate(45deg);
+  background:linear-gradient(145deg,var(--mobil),#1d4fd0);border:1.5px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(37,99,235,.34)}
+.locpin .h svg{transform:rotate(-45deg);width:14px;height:14px;color:#fff}
+
+/* ---------- leaflet popup ---------- */
+/* Leaflet's default popup fade is opacity 0->1 over 0.2s linear, which on hover
+   reads as a "gap" before the card appears. Snap it in so hover feels instant. */
+.leaflet-fade-anim .leaflet-popup{transition:opacity .08s ease-out}
+/* Desktop hover popups are purely informational — they close the instant the
+   cursor leaves the pin, so NOTHING in the popup may capture the mouse. The popup
+   opens above the pin and its downward TIP overlaps the top of the chip; Leaflet's
+   own CSS sets the tip to pointer-events:auto (an explicit value that overrides our
+   inherited none), so the tip sat over the chip's title/gap area and stole the
+   hover → mouseleave → close → reopen → flicker. Force every popup part (incl. the
+   tip + tip-container) to none. Touch keeps them interactive (tap, Navigate, ✕). */
+.leaflet-popup,.leaflet-popup-content-wrapper,.leaflet-popup-tip-container,.leaflet-popup-tip{pointer-events:none!important}
+.leaflet-popup{margin-bottom:6px}
+.leaflet-popup-content-wrapper{background:#fff;color:var(--txt);border:1px solid var(--line-bright);border-radius:13px;box-shadow:0 14px 40px rgba(40,42,48,.22)}
+body.is-touch .leaflet-popup,body.is-touch .leaflet-popup-content-wrapper,body.is-touch .leaflet-popup-tip-container,body.is-touch .leaflet-popup-tip{pointer-events:auto!important}
+.leaflet-popup-tip{background:#fff;border:1px solid var(--line-bright)}
+.leaflet-popup-content{margin:14px 15px}
+.leaflet-popup-close-button{color:var(--muted)!important;font-size:18px!important;padding:9px 9px 0 0!important}
+.pop .ph{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.pop .ph .dot{width:9px;height:9px;border-radius:50%}
+.pop .ph .dot.shell{background:var(--shell)} .pop .ph .dot.mobil{background:var(--mobil)}
+.pop .nm{font-size:16px;font-weight:700;letter-spacing:-.01em}
+.pop .meta{font-family:'Poppins',sans-serif;font-size:10px;color:var(--muted);margin:5px 0 11px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pop .fb{display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:20px;font-size:9px}
+.pop .fb .d{width:5px;height:5px;border-radius:50%}
+.fb-fresh{background:#e3f6ec;color:var(--fresh)} .fb-fresh .d{background:var(--fresh)}
+.fb-aging{background:#fbf0d8;color:var(--aging)} .fb-aging .d{background:var(--aging)}
+.fb-stale{background:#fbe3e2;color:var(--stale)} .fb-stale .d{background:var(--stale)}
+.fb-nodata{background:#edeef1;color:#8b9098} .fb-nodata .d{background:var(--nodata)}
+.pop .gr{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px}
+.pop .gc{background:#f6f5f1;border:1px solid var(--line);border-radius:8px;padding:7px 4px;text-align:center}
+.pop .gc.act{border-color:var(--fresh);background:#eefaf3}
+.pop .gc .g{font-family:'Poppins',sans-serif;font-size:8px;letter-spacing:.08em;color:var(--muted-2);text-transform:uppercase}
+.pop .gc .v{font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;margin-top:2px}
+.pop .gc .v.none{color:var(--muted-2)}
+.pop a.nav{display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;
+  color:#fff;background:var(--fresh);border-radius:8px;padding:9px;transition:filter .15s;box-shadow:0 3px 10px rgba(15,155,84,.25)}
+.pop a.nav:hover{filter:brightness(1.06)}

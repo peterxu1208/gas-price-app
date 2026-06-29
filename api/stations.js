@@ -54,7 +54,7 @@ export default async function handler(req, res) {
       })),
     }));
 
-    res.setHeader('Cache-Control', 's-maxage=21600, stale-while-revalidate=86400');   // 6h fresh, 24h stale-OK
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=86400');   // 24h fresh, +24h stale-OK — matches Google's ~daily refresh; caps Google hits at ~1/day/location
     return res.status(200).json(stations);
   } catch (e) {
     return res.status(502).json({ error: 'stations failed' });

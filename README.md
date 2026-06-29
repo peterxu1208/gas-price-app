@@ -35,9 +35,9 @@ still works). Just open `index.html`.
 | `index.html` | Markup + asset links. Loads Leaflet (CDN), then `data.js`, `services.js`, `app.js` (in that order). **Open this.** |
 | `styles.css` | All UI styling (was the inline `<style>` block). |
 | `data.js` | The sample-data **fixture** — `HOME` + `getStationData()`, exposed on `window.FuelData`. The current hand-written prices live here. |
-| `services.js` | **The single external-data boundary** (`window.FuelServices`): `getHomeStations()`, `geocode()`, `findStationsNear()`. Today these wrap the sample data + keyless OpenStreetMap; **this is the one file you edit to go live with Google** — each function has a `TODO(google)` marker. Domain helpers (brand classifier, distance) are injected by `app.js` so this layer stays UI-agnostic. |
+| `services.js` | **The single external-data boundary** (`window.FuelServices`): `getHomeStations()`, `geocode()`, `findStationsNear()`. Calls the Google proxy under `api/` (same-origin `fetch('/api/...')`). Domain helpers (brand classifier, distance) are injected by `app.js` so this layer stays UI-agnostic. |
 | `app.js` | All app logic — map, tiles+fallback, markers/popups, edge indicators, controls, search UI. Reads external data **only** through `window.FuelServices`. Wrapped in an IIFE, organized into labeled sections; boots asynchronously. |
-| `hope-ave-fuel-google.html` | A parallel port onto the real Google Maps JavaScript API (pixel-true Google basemap). Built once, then intentionally set aside mid-session — see DECISIONS.md for why. It's **behind** `index.html` in UI iterations and needs manual reconciling, not a straight swap. |
+| `api/geocode.js`, `api/stations.js` | Vercel serverless functions — the proxy to Google (Geocoding + Places `fuelOptions`). Keep the API key server-side; read it from the `GOOGLE_SERVER_KEY` env var. |
 | `DECISIONS.md` | Project decisions, scope, and gotchas. Read first. |
 | `DATA-SHAPE.md` | The exact JS object shape the frontend expects from `getStationData()` / a future `fetch('/api/prices')`. |
 
@@ -81,16 +81,18 @@ messy real-world name aliases that map to it, and optionally a real logo.
 Full reasoning and the non-obvious bits live in `DECISIONS.md`; the `brand` field
 contract is in `DATA-SHAPE.md`.
 
-## The single biggest next step
+## Live data (Google)
 
-Everything in the UI is built against **hand-written sample data**. The
-actual gas prices shown are not real. The next milestone is wiring up
-Google's Places API (`fuelOptions` field) behind a small serverless proxy
-— fully scoped in `DECISIONS.md` and `DATA-SHAPE.md`.
+Live prices + search now come from **Google** through the serverless proxy in
+`api/` (Geocoding + Places `fuelOptions`), called via the `services.js` boundary.
+Deploy to a host with serverless functions (e.g. Vercel), set the
+`GOOGLE_SERVER_KEY` env var, and the home map + search show real prices. Run
+locally without the proxy (`file://` or a plain static server) and the app shows
+an explicit "couldn't load live prices" state — it never falls back to fake
+sample numbers. (The sample data in `data.js` remains only as a fixture/reference.)
 
-Thanks to the `services.js` boundary, that swap is contained: replace the
-bodies of `getHomeStations()` / `geocode()` / `findStationsNear()` (each marked
-with a `TODO(google)`) to point at your proxy, keeping the return shapes. `app.js`
-and the UI don't change. The one piece *not* behind that boundary is the Leaflet
-basemap (woven through `app.js`); going pixel-true Google there means committing
-to the Google Maps JS API — see `DECISIONS.md` and `hope-ave-fuel-google.html`.
+The one piece still **not** from Google is the *basemap*: it's Leaflet with light
+CARTO tiles (reads close to Google), which is intentional and sufficient for
+current needs. A pixel-true Google basemap is optional and not required — see
+`DECISIONS.md` ("What's NOT done yet") if you ever want it; it would be a fresh
+build from the current `index.html`, not a resurrection of any old file.

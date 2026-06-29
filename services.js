@@ -19,8 +19,9 @@
    UI layer; brand + distance are applied here in toStation().
 
    LOCAL DEV: opened via file:// or a plain static server, /api doesn't exist,
-   so getHomeStations() falls back to the sample fixture (data.js) and search
-   surfaces a toast. Run `vercel dev` (or use the deployed URL) for live data.
+   so both the home load and search FAIL (throw) and the UI shows an explicit
+   "couldn't load live prices" toast — it never shows fake prices as if real.
+   Run `vercel dev` (or use the deployed URL) for live data.
 
    Loaded as a plain <script> AFTER data.js, BEFORE app.js (no build step, no ES
    modules). Exposes window.FuelServices.
@@ -62,17 +63,13 @@
     return raw.map(s => toStation(s, lat, lng)).sort((a, b) => a.distanceMi - b.distanceMi);
   }
 
-  /* ---- HOME STATIONS (with live prices) ---- */
+  /* ---- HOME STATIONS (with live prices) ----
+     Throws on failure (no proxy / network error). The caller (app.js boot)
+     catches it and shows an explicit "couldn't load live prices" toast — we
+     deliberately do NOT fall back to the sample fixture, so stale/fake prices
+     are never shown as if they were live. */
   async function getHomeStations() {
-    try {
-      return await fetchNear(FD.HOME.lat, FD.HOME.lng, 4000);
-    } catch (e) {
-      // No proxy reachable (file:// or static-only dev). Fall back to the sample
-      // fixture so the app still renders. NOTE: these are SAMPLE prices, not live
-      // — deploy the proxy (or run `vercel dev`) for real data.
-      console.warn('[services] live home stations unavailable, using sample data:', e.message);
-      return FD.getStationData();
-    }
+    return fetchNear(FD.HOME.lat, FD.HOME.lng, 4000);
   }
 
   /* ---- GEOCODE: query string → { lat, lng, label, full } | null ---- */

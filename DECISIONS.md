@@ -61,9 +61,11 @@ function-body change, not a control-flow change. The one external dependency
   easy to resurrect if ever wanted back.
 - **Map engine: Leaflet**, not the Google Maps JS API — by choice, specifically
   *so the basemap renders inside the Claude.ai artifact preview sandbox*,
-  which blocks some external tile hosts. A parallel **pixel-true Google Maps
-  JS API version exists** (see below) but was set aside so visual iteration
-  could continue with something that actually renders in-preview.
+  which blocks some external tile hosts. (An early parallel Google Maps JS API
+  build existed but has since been deleted — it diverged too far to be worth
+  reconciling. If a pixel-true Google basemap is ever wanted, rebuild it from the
+  current `index.html` rather than resurrecting that old file. See "What's NOT
+  done yet".)
 - **Fonts: Poppins**, replacing an earlier Bricolage Grotesque + Martian Mono
   pairing, per explicit request.
 - **Light mode only** — dark mode was built first, then explicitly replaced.
@@ -195,17 +197,19 @@ function-body change, not a control-flow change. The one external dependency
      upon earlier in the build — don't over-engineer real-time polling.
    - Need each station's real Google Place ID (not currently in the file —
      only lat/lng and a `maps.google.com/?cid=` link are stored).
-2. **Google Maps JS API version.** A parallel build
-   (`hope-ave-fuel-google.html`, included in this handoff — see below) already
-   ports the entire UI onto the real Google Maps JavaScript API instead of
-   Leaflet, so the basemap is pixel-true Google rather than a lookalike. It
-   was deliberately shelved mid-session so visual work could continue on a
-   version that renders in the Claude.ai preview sandbox (Google's API won't
-   render without a real key, which the sandbox can't supply). **This file
-   needs to be the merge target** once everything else stabilizes — every UI
-   change made to `index.html` (Leaflet) after this handoff needs to be
-   ported over to the Google version by hand, since they've diverged into two
-   files. Treat reconciling them as a real task, not an afterthought.
+2. **Google Maps JS API basemap (optional, not currently needed).** An early
+   parallel build (`Gas Price-google.html`) ported the UI onto the real Google
+   Maps JavaScript API for a pixel-true Google basemap, but it was shelved (it
+   won't render without a key) and has since been **deleted** — it had diverged
+   too far from `index.html` (brand filter, freshness stamp, `N/A` state, pin
+   labels, hover fixes, the `services.js` data layer) to be worth reconciling.
+   **For current progress and needs this is not required:** the live Google
+   *data* (prices + search) now flows through the `services.js` proxy while the
+   Leaflet basemap stays, and Leaflet with the light CARTO tiles reads very close
+   to Google. If a pixel-true Google basemap is ever wanted, treat it as a fresh
+   build *from the current `index.html`* (porting markers/popups/edge-indicators
+   to Advanced Markers + InfoWindow/OverlayView, and re-solving the hover
+   behavior on Google's terms) — not a resurrection of the old file.
 3. **Real Map ID / cloud styling**, if going the Google Maps route — currently
    uses a placeholder `DEMO_MAP_ID`, fine for testing Advanced Markers, but
    you'll want your own Map ID for custom styling.
@@ -222,8 +226,8 @@ function-body change, not a control-flow change. The one external dependency
 - `services.js` — the single external-data boundary (`window.FuelServices`);
   the one file to edit to go live with Google
 - `app.js` — UI + logic; reads external data only via `window.FuelServices`
-- `hope-ave-fuel-google.html` — parallel Google Maps JS API port, **behind**
-  index.html in UI iterations; needs reconciling, not just picking one
+- `api/geocode.js`, `api/stations.js` — Vercel serverless proxy to Google
+  (Geocoding + Places `fuelOptions`); keeps the API key server-side
 - `DECISIONS.md` — this file
 - `DATA-SHAPE.md` — the exact data contract `getStationData()` must return,
   so a live-data implementation matches what the UI already expects

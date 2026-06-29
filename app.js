@@ -583,7 +583,15 @@ function render() { renderMarkers(); updateEdgeIndicators(); updateFreshness(); 
 FuelServices.configure({ classify: classifyBrand, distMi });
 
 async function boot() {
-  HOME_STATIONS = await FuelServices.getHomeStations();
+  try {
+    HOME_STATIONS = await FuelServices.getHomeStations();
+  } catch (e) {
+    // No fake-data fallback: show an explicit, honest failure rather than
+    // sample prices that would read as live. Map stays empty; stamp → "no data".
+    console.error('[boot] live prices unavailable:', e);
+    HOME_STATIONS = [];
+    flash('Couldn’t load live prices — the data service didn’t respond. Check your connection and try again shortly.');
+  }
   DATA = HOME_STATIONS;
   renderBrandFilter(true);
   setLocationUI();

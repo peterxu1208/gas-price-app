@@ -21,8 +21,14 @@ export default async function handler(req, res) {
       + encodeURIComponent(q) + '&key=' + key;
     const r = await fetch(url);
     const j = await r.json();
-    if (j.status !== 'OK' || !j.results || !j.results.length) {
+    // Only a genuine "no such place" is null; any other non-OK status is a real
+    // error (e.g. REQUEST_DENIED = API not enabled / key restricted) — surface it
+    // so it can be diagnosed instead of silently looking like "no results".
+    if (j.status === 'ZERO_RESULTS' || !j.results || !j.results.length) {
       return res.status(200).json(null);   // honest "no match" — front end shows a toast
+    }
+    if (j.status !== 'OK') {
+      return res.status(502).json({ error: 'geocode ' + j.status, message: j.error_message || null });
     }
 
     const g = j.results[0];

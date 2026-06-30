@@ -589,7 +589,8 @@ function homeOrigin() {
 }
 function renderHomeChip() {
   const go = document.getElementById('homeGo'), label = document.getElementById('homeLabel');
-  if (savedHome) { go.disabled = false; label.textContent = savedHome.label || 'Home'; go.title = 'Go to ' + (savedHome.full || savedHome.label); }
+  // Chip shows just "Home"; the full saved address is the hover (system) tooltip.
+  if (savedHome) { go.disabled = false; label.textContent = 'Home'; go.title = savedHome.full || savedHome.label || 'Home'; }
   else { go.disabled = true; label.textContent = 'No home set'; go.title = 'Set a home address first (✎)'; }
 }
 

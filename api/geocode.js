@@ -11,14 +11,16 @@
 
 export default async function handler(req, res) {
   const q = (req.query.q || '').trim();
-  if (!q) return res.status(400).json({ error: 'missing q' });
+  const latlng = (req.query.latlng || '').trim();   // reverse geocode: "lat,lng"
+  if (!q && !latlng) return res.status(400).json({ error: 'missing q or latlng' });
 
   const key = process.env.GOOGLE_SERVER_KEY;
   if (!key) return res.status(500).json({ error: 'GOOGLE_SERVER_KEY not configured' });
 
   try {
-    const url = 'https://maps.googleapis.com/maps/api/geocode/json?address='
-      + encodeURIComponent(q) + '&key=' + key;
+    const url = 'https://maps.googleapis.com/maps/api/geocode/json?'
+      + (latlng ? 'latlng=' + encodeURIComponent(latlng) : 'address=' + encodeURIComponent(q))
+      + '&key=' + key;
     const r = await fetch(url);
     const j = await r.json();
     // Only a genuine "no such place" is null; any other non-OK status is a real

@@ -35,27 +35,45 @@ still works). Just open `index.html`.
 | `index.html` | Markup + asset links. Loads Leaflet (CDN), then `data.js`, `services.js`, `app.js` (in that order). **Open this.** |
 | `styles.css` | All UI styling (was the inline `<style>` block). |
 | `data.js` | The sample-data **fixture** — `HOME` + `getStationData()`, exposed on `window.FuelData`. The current hand-written prices live here. |
-| `services.js` | **The single external-data boundary** (`window.FuelServices`): `getHomeStations()`, `geocode()`, `findStationsNear()`. Calls the Google proxy under `api/` (same-origin `fetch('/api/...')`). Domain helpers (brand classifier, distance) are injected by `app.js` so this layer stays UI-agnostic. |
-| `app.js` | All app logic — map, tiles+fallback, markers/popups, edge indicators, controls, search UI. Reads external data **only** through `window.FuelServices`. Wrapped in an IIFE, organized into labeled sections; boots asynchronously. |
-| `api/geocode.js`, `api/stations.js` | Vercel serverless functions — the proxy to Google (Geocoding + Places `fuelOptions`). Keep the API key server-side; read it from the `GOOGLE_SERVER_KEY` env var. |
+| `services.js` | **The single external-data boundary** (`window.FuelServices`): `geocode()`, `findStationsNear()`, `getCurrentPosition()` (device GPS), `reverseGeocode()`. Calls the Google proxy under `api/` (same-origin `fetch('/api/...')`). Domain helpers (brand classifier, distance) are injected by `app.js` so this layer stays UI-agnostic. |
+| `app.js` | All app logic — map, tiles+fallback, markers/popups, edge indicators, controls, search + home/locate UI. Reads external data **only** through `window.FuelServices`. Home is saved per-device in `localStorage`. Wrapped in an IIFE; boots asynchronously. |
+| `api/geocode.js`, `api/stations.js` | Vercel serverless functions — the proxy to Google (Geocoding incl. reverse `latlng`, + Places `fuelOptions`). Keep the API key server-side; read it from the `GOOGLE_SERVER_KEY` env var. |
 | `DECISIONS.md` | Project decisions, scope, and gotchas. Read first. |
 | `DATA-SHAPE.md` | The exact JS object shape the frontend expects from `getStationData()` / a future `fetch('/api/prices')`. |
 
 ## Location search
 
 The toolbar card has a search bar: type any place ("Cambridge, MA", a street,
-a ZIP) and the map swaps to gas stations near there. The card's location name
-updates, and the locate button (or the ✕ in the search box) returns to the
-original 7 Hope Ave stations.
+a ZIP) and the map swaps to gas stations near there with live prices. The card's
+location name updates, and the ✕ in the search box returns to your home view.
 
-It's **keyless** — geocoding via OpenStreetMap Nominatim, nearby stations via
-Overpass — so it works from `file://` with no API key or proxy. Both calls live
-in `services.js` (`geocode()` / `findStationsNear()`), not `app.js`. The tradeoff:
-OSM has station *locations* but not *prices*, so searched stations render in the
-honest "no data" (`N/A`) state. The results are shaped exactly like
-`getStationData()`, so swapping in the planned Google `fuelOptions` proxy — by
-editing `services.js` only — fills in prices with no UI changes. See
-`DECISIONS.md` for the full rationale.
+Geocoding + nearby stations come from **Google** via the `api/` proxy, called
+through `services.js` (`geocode()` / `findStationsNear()`), never from `app.js`
+directly. See "Live data (Google)" below and `DECISIONS.md` for the full rationale.
+
+## Home & current location
+
+Three controls work together (all wired in `app.js`, with the device/Google calls
+behind `services.js`):
+
+- **Home chip** (top of the card) — jumps to your saved home. It's **disabled
+  until you set a home** ("No home set"); once set it shows the place name and is
+  clickable.
+- **✎ (edit) button** — type a home address; it's geocoded and **saved on your
+  device** (`localStorage`), so it persists across reloads.
+- **Bottom-right arrow → "Stations near me"** — uses the browser's free
+  `navigator.geolocation` (device GPS) to show live stations near where you are.
+
+**Per-device by design.** Home is stored in `localStorage`, which is scoped to
+each browser+device — so different people on different devices each get their own
+home automatically, with no accounts or backend. (Caveat: it's per-browser, not
+synced across a single person's own devices; true cross-device sync would need
+sign-in + a database — out of scope.)
+
+**First-open default:** with no saved home yet, the app asks for your location and
+opens to **stations near you**; if you deny or it's unavailable, it falls back to a
+default seed view (Waltham). Returning users with a saved home open straight to it.
+Geolocation needs **HTTPS** (Vercel qualifies) and a one-time permission grant.
 
 ### Brands & filtering
 

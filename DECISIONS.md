@@ -129,24 +129,65 @@ function-body change, not a control-flow change. The one external dependency
     membership. Brand accent color is applied via an inline `--brand` CSS var on
     each pin/edge-chip, with CSS falling back to neutral for `other`.
 - **Origin marker is now dynamic.** The single home-pin became `renderOrigin()`:
-  a house icon labeled HOME at home, or a blue teardrop labeled with the searched
-  place. `DATA` is no longer a `const` — it's the *active* set (`HOME_STATIONS`
-  is the canonical original 7). The `PAD` constant centralizes the toolbar
-  padding used for framing/edge-chips, bumped up because the card is now taller.
-- **Politeness / limits.** Search fires on submit only (not per keystroke).
-  Nominatim's usage policy is ~1 req/sec; fine for personal use. If a host is
-  ever slow/blocked, the search surfaces a transient error toast and keeps the
-  current set.
+  a house icon at home, or a blue teardrop at a searched / current-location place.
+  `DATA` is the *active* set on screen (home, search, or "near me"), populated
+  asynchronously at `boot()` from `services.js` — there is no longer a fixed
+  `HOME_STATIONS` array; `homeOrigin()` derives the home point from the saved
+  `localStorage` home (or the Waltham seed). The `PAD` constant centralizes the
+  toolbar padding used for framing/edge-chips, bumped up because the card is taller.
+- **Politeness / limits.** Search fires on submit only (not per keystroke). If a
+  host is ever slow/blocked, the search surfaces a transient error toast and keeps
+  the current set.
+
+## Home location & current-location detection (added later)
+
+- **Home is settable and saved per-device, not hardcoded.** Waltham is no longer
+  special — it's just a default *seed*. The user's home lives in `localStorage`
+  (`fuelHome` = `{lat,lng,label,full}`), set by typing an address into the **✎
+  editor** (geocoded via the Google proxy). The top **home chip** is **disabled
+  until a home is set**, then shows the place name and jumps there on click.
+- **Per-device by design — no accounts, no backend.** `localStorage` is scoped to
+  each browser+device, so different people on different devices automatically get
+  independent homes for free. Deliberate tradeoff: it's **per-browser**, not synced
+  across a single user's devices, and is lost if they clear site data. True
+  cross-device, per-account sync would require sign-in + a database — intentionally
+  out of scope for a personal app.
+- **"Stations near me"** (the bottom-right button, repurposed from the old
+  "back to home"): browser-native `navigator.geolocation` (free, no key) →
+  `findStationsNear()`. Needs **HTTPS** (Vercel) + a one-time permission grant;
+  desktop accuracy is Wi-Fi/IP-based (rougher), mobile is GPS-accurate. Denied/
+  unsupported → honest toast, current view kept.
+- **First-open default = current location.** With no saved home, `boot()` requests
+  the device location and opens to **stations near you**; if denied/unavailable it
+  falls back to the Waltham seed. Returning users with a saved home open straight
+  to it (no prompt). This was an explicit choice for the multi-user case — defaulting
+  everyone to Waltham would be meaningless for non-local users.
+- **All external calls still go through `services.js`.** Added `getCurrentPosition()`
+  (device) and `reverseGeocode()` (for a friendly "near me" / set-home label, via the
+  proxy's new `latlng` param). The brand registry/colors stay injected from `app.js`.
+- **Cost note:** geolocation is free; only the reverse-geocode label touches Google
+  (negligible, and the `/api/stations` cache is the real cost lever). See "What's NOT
+  done yet" / the cost guardrails below.
 
 ## Known non-obvious implementation details (read before touching these)
 
-- **The hover-popup "Navigate" button bug and its fix.** Early on, moving the
-  cursor from a pin toward the popup's Navigate link would close the popup
-  before the click landed. Root cause: a "hover bridge" was wired but never
-  actually checked before closing — `mouseout` closed the popup unconditionally.
-  Current fix: `cancelPendingClose()` / `scheduleClose()`, a 220ms grace-period
-  timer attached per-marker via `pop.on('add', ...)`. If you touch hover
-  behavior, preserve this pattern or you'll reintroduce the bug.
+- **Hover-card interaction (dwell-to-open + grace-to-close bridge).** This was
+  rebuilt several times; the current design is deliberate — read before touching.
+  Hover open/close is bound to the visible `.ptag` chip (via `mouseenter`/
+  `mouseleave`), NOT Leaflet's bubbling `mouseover`/`mouseout`.
+  - **Open after a ~130ms dwell** (`HOVER_OPEN_MS`) so quick fly-bys over
+    neighbouring pins don't strobe popups open/closed.
+  - **Close after a ~260ms grace** (`HOVER_CLOSE_MS`); entering the popup CARD
+    cancels it, so the cursor can travel from the pin onto the card to read it /
+    click NAVIGATE. Closes only when the cursor leaves both.
+  - **Pointer-events are load-bearing:** the popup CARD (`.leaflet-popup-content-wrapper`)
+    is `pointer-events:auto` (so the bridge + NAVIGATE work), but the popup TIP and
+    outer box are forced `pointer-events:none!important` — the tip overlaps the chip
+    and, if interactive, steals the hover and reintroduces flicker. The marker icon
+    box is also `none` (only the chip is interactive) so adjacent pins' invisible hit
+    boxes don't overlap. `autoPan:false` on the popup so opening never moves the map.
+  - A `[BUG]` logging pass proved the earlier "map jumping" was actually this popup
+    strobing (the map never moved). Don't reintroduce instant-close-on-leave.
 - **Off-screen direction indicators.** Any visible station whose pin falls
   outside the safe viewport (excluding the toolbar's footprint) gets a small
   arrow chip clamped to the nearest edge, pointing toward it, clickable to fly

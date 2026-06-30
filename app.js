@@ -670,7 +670,22 @@ FuelServices.configure({ classify: classifyBrand, distMi });
 
 async function boot() {
   renderHomeChip();
-  origin = homeOrigin();   // saved home if set, else the Waltham default seed
+  // Where to open:
+  //   • a previously-saved home wins (returning user's explicit choice), else
+  //   • FIRST OPEN → default to the user's current location (device GPS), else
+  //   • if location is denied/unavailable → fall back to the Waltham default seed.
+  if (savedHome) {
+    origin = homeOrigin();
+  } else {
+    setStamp('finding your location…');
+    try {
+      const pos = await FuelServices.getCurrentPosition();
+      const rev = await FuelServices.reverseGeocode(pos.lat, pos.lng);
+      origin = { lat: pos.lat, lng: pos.lng, label: rev ? rev.label : 'Current location', fullLabel: rev ? rev.full : 'Your current location', isHome: false };
+    } catch (e) {
+      origin = homeOrigin();   // permission denied / unsupported → default seed
+    }
+  }
   try {
     DATA = await FuelServices.findStationsNear(origin.lat, origin.lng);
   } catch (e) {

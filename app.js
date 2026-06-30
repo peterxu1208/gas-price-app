@@ -638,7 +638,9 @@ function openHomeEditor() {
   const modal = document.getElementById('homeModal'), inp = document.getElementById('homeInput');
   modal.hidden = false;
   inp.value = savedHome ? (savedHome.full || savedHome.label) : '';
-  inp.focus(); inp.select();
+  inp.focus();
+  // Place the caret at the end rather than selecting all (no default highlight).
+  const end = inp.value.length; inp.setSelectionRange(end, end);
   syncHomeInputClear();
 }
 function closeHomeEditor() { document.getElementById('homeModal').hidden = true; }

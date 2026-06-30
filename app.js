@@ -669,7 +669,7 @@ document.getElementById('searchForm').addEventListener('submit', e => { e.preven
 document.getElementById('searchInput').addEventListener('input', syncSearchClear);
 document.getElementById('searchClear').addEventListener('click', () => { const inp = document.getElementById('searchInput'); inp.value = ''; syncSearchClear(); inp.focus(); });
 document.getElementById('locateBtn').addEventListener('click', locateMe);
-document.getElementById('homeGo').addEventListener('click', () => { if (savedHome) goToPlace(homeOrigin()); });
+document.getElementById('homeGo').addEventListener('click', () => { if (!savedHome) return; document.getElementById('searchInput').value = ''; syncSearchClear(); goToPlace(homeOrigin()); });
 document.getElementById('homeEdit').addEventListener('click', openHomeEditor);
 document.getElementById('homeCancel').addEventListener('click', closeHomeEditor);
 document.getElementById('homeModalClose').addEventListener('click', closeHomeEditor);   // backdrop click

@@ -53,29 +53,35 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
   border:1px solid var(--line-bright);border-radius:15px;padding:11px 13px;box-shadow:var(--shadow);
   display:flex;flex-direction:column;gap:9px;width:300px;max-width:100%}
 
-/* ---------- home chip (set/go to a saved home location) ---------- */
-.homerow{gap:6px;overflow:visible}
-.home-chip{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:7px;height:34px;padding:0 11px;
-  background:#fff;border:1px solid var(--line-bright);border-radius:9px;cursor:pointer;
+/* ---------- home control (floats on the map, outside the toolbar) ---------- */
+/* Top-right, content-hugging. Absolutely positioned → shrink-wraps its content,
+   so it doesn't blanket the map. The edit form drops below, right-aligned. */
+.home-float{position:absolute;top:14px;right:14px;z-index:1000;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.home-row{display:flex;align-items:center;gap:6px}
+.home-chip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--line-bright);border-radius:9px;cursor:pointer;white-space:nowrap;
   font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;color:var(--txt);
-  box-shadow:0 1px 3px rgba(40,42,48,.10);transition:.14s}
-.home-chip:hover:not(:disabled){border-color:var(--fresh);box-shadow:0 2px 7px rgba(40,42,48,.14)}
-.home-chip:disabled{cursor:default;color:var(--muted-2);background:#f1efe9;border-color:var(--line);box-shadow:none}
+  box-shadow:var(--shadow);transition:.14s}
+.home-chip:hover:not(:disabled){border-color:var(--fresh)}
+.home-chip:disabled{cursor:default;color:var(--muted-2);background:rgba(241,239,233,.92);border-color:var(--line)}
 .home-ic{width:14px;height:14px;flex:none;color:var(--fresh)}
 .home-chip:disabled .home-ic{color:var(--muted-2)}
-.home-chip #homeLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .home-edit{flex:none;display:flex;align-items:center;justify-content:center;width:34px;height:34px;
-  background:#efece5;border:1px solid var(--line);border-radius:9px;color:var(--muted);cursor:pointer;transition:.14s}
-.home-edit:hover{color:var(--txt);border-color:var(--line-bright)}
+  background:rgba(255,255,255,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--line-bright);border-radius:9px;color:var(--muted);cursor:pointer;transition:.14s;box-shadow:var(--shadow)}
+.home-edit:hover{color:var(--txt);border-color:var(--fresh)}
 .home-edit svg{width:14px;height:14px}
-.home-edit-form{gap:6px;overflow:visible}
-.home-edit-form input{flex:1 1 auto;min-width:0;height:34px;padding:0 10px;border:1px solid var(--line);border-radius:9px;
-  background:#efece5;outline:none;font-family:'Poppins',sans-serif;font-size:11px;color:var(--txt)}
+.home-edit-form{display:flex;align-items:center;gap:6px;padding:6px;border-radius:11px;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--line-bright);box-shadow:var(--shadow)}
+.home-edit-form input{width:200px;max-width:52vw;height:32px;padding:0 10px;border:1px solid var(--line);border-radius:8px;
+  background:#fff;outline:none;font-family:'Poppins',sans-serif;font-size:11px;color:var(--txt)}
 .home-edit-form input::placeholder{color:var(--muted-2)}
-.home-save{flex:none;height:34px;padding:0 12px;border:0;border-radius:9px;background:var(--fresh);color:#fff;
+.home-save{flex:none;height:32px;padding:0 12px;border:0;border-radius:8px;background:var(--fresh);color:#fff;
   font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:filter .14s}
 .home-save:hover{filter:brightness(1.06)}
-.home-cancel{flex:none;width:34px;height:34px;border:1px solid var(--line);border-radius:9px;background:#efece5;
+.home-cancel{flex:none;width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:#fff;
   color:var(--muted);cursor:pointer;font-size:13px;line-height:1;transition:.14s}
 .home-cancel:hover{color:var(--txt)}
 

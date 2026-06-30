@@ -628,14 +628,14 @@ async function locateMe() {
   goToPlace({ lat: pos.lat, lng: pos.lng, label: rev ? rev.label : 'Current location', fullLabel: rev ? rev.full : 'Your current location', isHome: false });
 }
 
-// Set / change the saved home address (typed into the ✎ box, then geocoded).
+// Set / change the saved home address — a screen-level modal (opened by the gear).
 function openHomeEditor() {
-  const form = document.getElementById('homeEditForm'), inp = document.getElementById('homeInput');
-  form.hidden = false;
+  const modal = document.getElementById('homeModal'), inp = document.getElementById('homeInput');
+  modal.hidden = false;
   inp.value = savedHome ? (savedHome.full || savedHome.label) : '';
   inp.focus(); inp.select();
 }
-function closeHomeEditor() { document.getElementById('homeEditForm').hidden = true; }
+function closeHomeEditor() { document.getElementById('homeModal').hidden = true; }
 async function submitHome(q) {
   const text = (q || '').trim(); if (!text) return;
   const inp = document.getElementById('homeInput'); inp.disabled = true;
@@ -660,6 +660,8 @@ document.getElementById('locateBtn').addEventListener('click', locateMe);
 document.getElementById('homeGo').addEventListener('click', () => { if (savedHome) goToPlace(homeOrigin()); });
 document.getElementById('homeEdit').addEventListener('click', openHomeEditor);
 document.getElementById('homeCancel').addEventListener('click', closeHomeEditor);
+document.getElementById('homeModalClose').addEventListener('click', closeHomeEditor);   // backdrop click
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('homeModal').hidden) closeHomeEditor(); });
 document.getElementById('homeEditForm').addEventListener('submit', e => { e.preventDefault(); submitHome(document.getElementById('homeInput').value); });
 
 /* ===================== boot ===================== */

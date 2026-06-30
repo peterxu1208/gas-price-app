@@ -557,6 +557,7 @@ async function runSearch(query) {
     const stations = await FuelServices.findStationsNear(place.lat, place.lng);
     if (!stations.length) flash(`No gas stations found near ${place.label}.`);
     setActiveSet(stations, { lat: place.lat, lng: place.lng, label: place.label, fullLabel: place.full, isHome: false });
+    document.getElementById('searchInput').value = ''; syncSearchClear();   // search done → empty the box
   } catch (err) {
     console.error('[search]', err);
     // A blocked/failed fetch throws a TypeError ("Failed to fetch"). The most

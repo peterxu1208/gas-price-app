@@ -488,7 +488,7 @@ function setLocationUI() {
   const nameEl = document.getElementById('locName');
   nameEl.textContent = origin.label || '—';
   nameEl.title = origin.fullLabel || origin.label || '';
-  document.getElementById('searchClear').hidden = !!origin.isHome;
+  syncSearchClear();   // ✕ shows only when there's search text to clear
 }
 const setStamp = txt => { document.getElementById('syncStamp').textContent = txt; };
 
@@ -659,8 +659,15 @@ async function submitHome(q) {
   } finally { inp.disabled = false; }
 }
 
+// The ✕ just clears the search text — it does NOT move the map. The current view
+// and results stay exactly where they are; only the text box is emptied.
+function syncSearchClear() {
+  const inp = document.getElementById('searchInput');
+  document.getElementById('searchClear').hidden = !inp.value;
+}
 document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); runSearch(document.getElementById('searchInput').value); });
-document.getElementById('searchClear').addEventListener('click', () => { document.getElementById('searchInput').value = ''; goToPlace(homeOrigin()); });
+document.getElementById('searchInput').addEventListener('input', syncSearchClear);
+document.getElementById('searchClear').addEventListener('click', () => { const inp = document.getElementById('searchInput'); inp.value = ''; syncSearchClear(); inp.focus(); });
 document.getElementById('locateBtn').addEventListener('click', locateMe);
 document.getElementById('homeGo').addEventListener('click', () => { if (savedHome) goToPlace(homeOrigin()); });
 document.getElementById('homeEdit').addEventListener('click', openHomeEditor);

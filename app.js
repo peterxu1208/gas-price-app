@@ -17,12 +17,10 @@
 /* ===================== config / state ===================== */
 const { NOW, HOME } = window.FuelData;
 
-// The original 7 Hope Ave stations are the "home" set; DATA is the *active*
-// set on screen, which the location search swaps out (and the home button
-// restores). `origin` is the current reference point — home, or a searched place.
-// HOME_STATIONS / DATA start empty and are populated asynchronously at boot()
-// from the services layer (sample data today, a Google proxy fetch later).
-let HOME_STATIONS = [];
+// DATA is the *active* set of stations on screen, which home / search / "near me"
+// swap out. `origin` is the current reference point — home, a searched place, or the
+// device location. DATA starts empty and is populated asynchronously at boot() from
+// the services layer (the Google proxy).
 let DATA = [];
 let origin = { lat: HOME.lat, lng: HOME.lng, label: 'Hope Ave', fullLabel: '60 Hope Ave, Waltham, MA', isHome: true };
 
@@ -574,21 +572,94 @@ async function runSearch(query) {
   }
 }
 
-/* ---- home: restore the original 7 and the deliberate home-centering recenter ---- */
-function goHome() {
+/* ===================== home + current location =====================
+   Home is settable and saved on THIS device (localStorage). Until one is set, the
+   home chip is disabled and the app seeds with the original Waltham default so the
+   map isn't empty. The bottom-right button is now "stations near me" (device GPS). */
+const HOME_KEY = 'fuelHome';
+function loadHome() { try { return JSON.parse(localStorage.getItem(HOME_KEY)); } catch (e) { return null; } }
+function saveHome(h) { try { localStorage.setItem(HOME_KEY, JSON.stringify(h)); } catch (e) {} }
+let savedHome = loadHome();   // { lat, lng, label, full } or null
+
+// Origin for the home location: the saved one, else the Waltham default seed.
+function homeOrigin() {
+  return savedHome
+    ? { lat: savedHome.lat, lng: savedHome.lng, label: savedHome.label, fullLabel: savedHome.full || savedHome.label, isHome: true }
+    : { lat: HOME.lat, lng: HOME.lng, label: 'Hope Ave', fullLabel: '60 Hope Ave, Waltham, MA', isHome: true };
+}
+function renderHomeChip() {
+  const go = document.getElementById('homeGo'), label = document.getElementById('homeLabel');
+  if (savedHome) { go.disabled = false; label.textContent = savedHome.label || 'Home'; go.title = 'Go to ' + (savedHome.full || savedHome.label); }
+  else { go.disabled = true; label.textContent = 'No home set'; go.title = 'Set a home address first (✎)'; }
+}
+
+// Fetch stations near an origin and swap the view. Shared by home / search-clear /
+// "near me" / setting a new home.
+async function goToPlace(o) {
+  setBusy(true); setStamp('finding stations…');
+  try {
+    const stations = await FuelServices.findStationsNear(o.lat, o.lng);
+    if (!stations.length) flash(`No gas stations found near ${o.label}.`);
+    setActiveSet(stations, o);
+  } catch (err) {
+    console.error('[goToPlace]', err);
+    flash('Couldn’t load stations there. Check your connection and try again.');
+    updateFreshness();
+  } finally { setBusy(false); }
+}
+
+// "Stations near me" — device geolocation → nearby stations + a friendly label.
+async function locateMe() {
+  setBusy(true); setStamp('finding your location…');
+  let pos;
+  try { pos = await FuelServices.getCurrentPosition(); }
+  catch (err) {
+    setBusy(false);
+    flash(err && err.code === 1
+      ? 'Location permission denied — allow location access to find stations near you.'
+      : 'Couldn’t get your location. Try again, or search instead.');
+    updateFreshness();
+    return;
+  }
+  const rev = await FuelServices.reverseGeocode(pos.lat, pos.lng);
+  setBusy(false);
   document.getElementById('searchInput').value = '';
-  setActiveSet(HOME_STATIONS, { lat: HOME.lat, lng: HOME.lng, label: 'Hope Ave', fullLabel: '60 Hope Ave, Waltham, MA', isHome: true }, { frame: false });
-  // find the zoom that fits everything, but center HOME (not the bounds midpoint),
-  // with a pixel shift to compensate for the toolbar's footprint. (See DECISIONS.md.)
-  const fitZoom = map.getBoundsZoom(currentBounds(), false, L.point(PAD.side, PAD.top), L.point(PAD.side, PAD.bottom));
-  const pxShift = (PAD.top - PAD.bottom) / 2;
-  map.flyTo([HOME.lat, HOME.lng], fitZoom, { duration: .6 });
-  map.once('moveend', () => { map.panBy([0, -pxShift], { animate: false }); });
+  goToPlace({ lat: pos.lat, lng: pos.lng, label: rev ? rev.label : 'Current location', fullLabel: rev ? rev.full : 'Your current location', isHome: false });
+}
+
+// Set / change the saved home address (typed into the ✎ box, then geocoded).
+function openHomeEditor() {
+  const form = document.getElementById('homeEditForm'), inp = document.getElementById('homeInput');
+  form.hidden = false;
+  inp.value = savedHome ? (savedHome.full || savedHome.label) : '';
+  inp.focus(); inp.select();
+}
+function closeHomeEditor() { document.getElementById('homeEditForm').hidden = true; }
+async function submitHome(q) {
+  const text = (q || '').trim(); if (!text) return;
+  const inp = document.getElementById('homeInput'); inp.disabled = true;
+  try {
+    const place = await FuelServices.geocode(text);
+    if (!place) { flash(`Couldn’t find “${text}”.`); return; }
+    savedHome = { lat: place.lat, lng: place.lng, label: place.label, full: place.full };
+    saveHome(savedHome);
+    renderHomeChip();
+    closeHomeEditor();
+    document.getElementById('searchInput').value = '';
+    goToPlace(homeOrigin());
+  } catch (err) {
+    console.error('[setHome]', err);
+    flash('Couldn’t set home (search service error).');
+  } finally { inp.disabled = false; }
 }
 
 document.getElementById('searchForm').addEventListener('submit', e => { e.preventDefault(); runSearch(document.getElementById('searchInput').value); });
-document.getElementById('searchClear').addEventListener('click', goHome);
-document.getElementById('locateBtn').addEventListener('click', goHome);
+document.getElementById('searchClear').addEventListener('click', () => { document.getElementById('searchInput').value = ''; goToPlace(homeOrigin()); });
+document.getElementById('locateBtn').addEventListener('click', locateMe);
+document.getElementById('homeGo').addEventListener('click', () => { if (savedHome) goToPlace(homeOrigin()); });
+document.getElementById('homeEdit').addEventListener('click', openHomeEditor);
+document.getElementById('homeCancel').addEventListener('click', closeHomeEditor);
+document.getElementById('homeEditForm').addEventListener('submit', e => { e.preventDefault(); submitHome(document.getElementById('homeInput').value); });
 
 /* ===================== boot ===================== */
 function render() { renderMarkers(); updateEdgeIndicators(); updateFreshness(); }
@@ -598,16 +669,17 @@ function render() { renderMarkers(); updateEdgeIndicators(); updateFreshness(); 
 FuelServices.configure({ classify: classifyBrand, distMi });
 
 async function boot() {
+  renderHomeChip();
+  origin = homeOrigin();   // saved home if set, else the Waltham default seed
   try {
-    HOME_STATIONS = await FuelServices.getHomeStations();
+    DATA = await FuelServices.findStationsNear(origin.lat, origin.lng);
   } catch (e) {
     // No fake-data fallback: show an explicit, honest failure rather than
     // sample prices that would read as live. Map stays empty; stamp → "no data".
     console.error('[boot] live prices unavailable:', e);
-    HOME_STATIONS = [];
+    DATA = [];
     flash('Couldn’t load live prices — the data service didn’t respond. Check your connection and try again shortly.');
   }
-  DATA = HOME_STATIONS;
   renderBrandFilter(true);
   setLocationUI();
   renderOrigin();

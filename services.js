@@ -84,5 +84,30 @@
     return fetchNear(lat, lng, radiusM);
   }
 
-  window.FuelServices = { configure, getHomeStations, geocode, findStationsNear };
+  /* ---- CURRENT LOCATION: device geolocation → { lat, lng } ----
+     Browser-native (free, no key), but needs HTTPS and a one-time user permission.
+     Rejects with the GeolocationPositionError (.code 1 = denied) so callers can
+     show the right message. */
+  function getCurrentPosition() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error('geolocation unsupported'));
+      navigator.geolocation.getCurrentPosition(
+        p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        err => reject(err),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    });
+  }
+
+  /* ---- REVERSE GEOCODE: (lat,lng) → { lat,lng,label,full } | null ----
+     For a friendly label on "near me" / a set-home pin. Best-effort; never throws. */
+  async function reverseGeocode(lat, lng) {
+    try {
+      const r = await fetch('/api/geocode?latlng=' + encodeURIComponent(lat + ',' + lng));
+      if (!r.ok) return null;
+      return r.json();
+    } catch (e) { return null; }
+  }
+
+  window.FuelServices = { configure, getHomeStations, geocode, findStationsNear, getCurrentPosition, reverseGeocode };
 })();

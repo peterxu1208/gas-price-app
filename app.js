@@ -338,8 +338,8 @@ function drawMarkers() {
       m.on('add', () => {
         const chip = m.getElement() && m.getElement().querySelector('.ptag');
         if (!chip) return;
-        chip.addEventListener('mouseenter', () => m.openPopup());
-        chip.addEventListener('mouseleave', () => m.closePopup());
+        chip.addEventListener('mouseenter', () => { console.log('[BUG]', (performance.now()|0), 'hover.enter', s.id); m.openPopup(); });
+        chip.addEventListener('mouseleave', () => { console.log('[BUG]', (performance.now()|0), 'hover.leave', s.id); m.closePopup(); });
       });
       pop.on('add', () => applyLogoFallbacks(pop.getElement()));
     }
@@ -393,7 +393,7 @@ function makeEdgeChip() {
   el.style.transform = 'translate(-50%,-50%)';
   el.innerHTML = '<svg class="arrow" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2L4.5 20l7.5-4.2L19.5 20z"/></svg><span class="ec-val"></span>';
   const rec = { el, arrow: el.querySelector('.arrow'), val: el.querySelector('.ec-val'), station: null };
-  el.addEventListener('click', () => { if (rec.station) setActiveFromEdge(rec.station); });
+  el.addEventListener('click', () => { console.log('[BUG]', (performance.now()|0), 'edgeChip.click', rec.station && rec.station.id); if (rec.station) setActiveFromEdge(rec.station); });
   return rec;
 }
 
@@ -440,6 +440,7 @@ function updateEdgeIndicators() {
 }
 
 function setActiveFromEdge(s) {
+  console.log('[BUG]', (performance.now()|0), 'setActiveFromEdge -> flyTo', s.id);
   map.flyTo([s.lat, s.lng], Math.max(map.getZoom(), 14), { duration: .55 });
   map.once('moveend', () => {
     const mk = markerById[s.id];
@@ -455,6 +456,8 @@ function scheduleEdgeUpdate() {
   edgeRaf = requestAnimationFrame(() => { edgeRaf = null; updateEdgeIndicators(); });
 }
 map.on('move zoom moveend zoomend resize', scheduleEdgeUpdate);
+// TEMP: log every map-move start with a stack trace so we can see what initiated it.
+map.on('movestart zoomstart', (e) => { console.log('[BUG]', (performance.now()|0), 'map.' + e.type); console.trace('[BUG] move origin'); });
 
 /* ===================== controls ===================== */
 function bindSeg(id, key) {
@@ -503,6 +506,7 @@ function updateFreshness() {
 
 /* ---- swap the active station set + origin, then redraw and re-frame ---- */
 function setActiveSet(stations, newOrigin, { frame = true } = {}) {
+  console.log('[BUG]', (performance.now()|0), 'setActiveSet', stations.length, newOrigin && newOrigin.label, 'frame=' + frame);
   DATA = stations;
   origin = newOrigin;
   renderBrandFilter(true);      // rebuild brand checkboxes for the new area (majors on, Other off)
@@ -561,6 +565,7 @@ async function runSearch(query) {
 
 /* ---- home: restore the original 7 and the deliberate home-centering recenter ---- */
 function goHome() {
+  console.log('[BUG]', (performance.now()|0), 'goHome');
   document.getElementById('searchInput').value = '';
   setActiveSet(HOME_STATIONS, { lat: HOME.lat, lng: HOME.lng, label: 'Hope Ave', fullLabel: '60 Hope Ave, Waltham, MA', isHome: true }, { frame: false });
   // find the zoom that fits everything, but center HOME (not the bounds midpoint),

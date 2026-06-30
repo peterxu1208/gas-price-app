@@ -54,6 +54,10 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
   display:inline-flex;align-items:flex-start;gap:8px;max-width:calc(100% - 28px)}
 .topcard{pointer-events:auto;background:rgba(255,255,255,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   border:1px solid var(--line-bright);border-radius:15px;padding:11px 13px;box-shadow:var(--shadow);
+  /* overflow:hidden clips the backdrop-filter cleanly to the rounded rect — without
+     it Chromium leaves a small "beak" spur at the corners. The Other tooltip is
+     position:fixed so it isn't clipped. */
+  overflow:hidden;
   display:flex;flex-direction:column;gap:9px;width:300px;max-width:100%}
 
 /* ---------- home control (a compact pill beside the toolbar) ---------- */

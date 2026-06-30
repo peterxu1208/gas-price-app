@@ -639,8 +639,9 @@ function openHomeEditor() {
   modal.hidden = false;
   inp.value = savedHome ? (savedHome.full || savedHome.label) : '';
   inp.focus();
-  // Place the caret at the end rather than selecting all (no default highlight).
-  const end = inp.value.length; inp.setSelectionRange(end, end);
+  // No default highlight; caret at the start so the field shows the beginning
+  // of a long address rather than scrolling to its end.
+  inp.setSelectionRange(0, 0); inp.scrollLeft = 0;
   syncHomeInputClear();
 }
 function closeHomeEditor() { document.getElementById('homeModal').hidden = true; }

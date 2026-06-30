@@ -57,7 +57,10 @@
   <div class="home-modal-backdrop" id="homeModalClose"></div>
   <form class="home-modal-card" id="homeEditForm" role="dialog" aria-modal="true" aria-label="Set home address">
     <div class="home-modal-title">Set home address</div>
-    <input id="homeInput" type="text" placeholder="Enter a home address…" aria-label="Home address" enterkeyhint="done" autocomplete="off">
+    <div class="home-input-wrap">
+      <input id="homeInput" type="text" placeholder="Enter a home address…" aria-label="Home address" enterkeyhint="done" autocomplete="off">
+      <button type="button" id="homeInputClear" class="home-input-clear" title="Clear" aria-label="Clear text" hidden>✕</button>
+    </div>
     <div class="home-modal-actions">
       <button type="button" id="homeCancel" class="home-cancel">Cancel</button>
       <button type="submit" class="home-save">Save</button>

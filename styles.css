@@ -76,14 +76,21 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 /* ---------- set-home modal (screen-level popup, opened by the gear) ---------- */
 .home-modal{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px}
 .home-modal[hidden]{display:none}
-.home-modal-backdrop{position:absolute;inset:0;background:rgba(20,22,26,.45);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+/* No backdrop-filter here: a full-viewport blur re-composites on every keystroke
+   and makes the input laggy. A plain dim overlay is smooth. */
+.home-modal-backdrop{position:absolute;inset:0;background:rgba(20,22,26,.5)}
 .home-modal-card{position:relative;z-index:1;width:340px;max-width:100%;display:flex;flex-direction:column;gap:13px;
   background:#fff;border:1px solid var(--line-bright);border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(20,22,26,.4)}
 .home-modal-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:var(--txt)}
-.home-modal-card input{width:100%;height:40px;padding:0 13px;border:1px solid var(--line);border-radius:10px;background:#fff;
+.home-input-wrap{position:relative;display:flex}
+.home-modal-card input{width:100%;height:40px;padding:0 36px 0 13px;border:1px solid var(--line);border-radius:10px;background:#fff;
   outline:none;font-family:'Poppins',sans-serif;font-size:12px;color:var(--txt);transition:border-color .14s}
 .home-modal-card input:focus{border-color:var(--fresh)}
 .home-modal-card input::placeholder{color:var(--muted-2)}
+.home-input-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:26px;height:26px;
+  display:flex;align-items:center;justify-content:center;border:0;border-radius:7px;background:transparent;
+  color:var(--muted-2);cursor:pointer;font-size:12px;line-height:1;transition:.14s}
+.home-input-clear:hover{color:var(--txt);background:rgba(0,0,0,.06)}
 .home-modal-actions{display:flex;justify-content:flex-end;gap:8px}
 .home-save{height:38px;padding:0 18px;border:0;border-radius:10px;background:var(--fresh);color:#fff;
   font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:filter .14s}

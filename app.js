@@ -629,11 +629,16 @@ async function locateMe() {
 }
 
 // Set / change the saved home address — a screen-level modal (opened by the gear).
+function syncHomeInputClear() {
+  const inp = document.getElementById('homeInput');
+  document.getElementById('homeInputClear').hidden = !inp.value;
+}
 function openHomeEditor() {
   const modal = document.getElementById('homeModal'), inp = document.getElementById('homeInput');
   modal.hidden = false;
   inp.value = savedHome ? (savedHome.full || savedHome.label) : '';
   inp.focus(); inp.select();
+  syncHomeInputClear();
 }
 function closeHomeEditor() { document.getElementById('homeModal').hidden = true; }
 async function submitHome(q) {
@@ -662,6 +667,8 @@ document.getElementById('homeEdit').addEventListener('click', openHomeEditor);
 document.getElementById('homeCancel').addEventListener('click', closeHomeEditor);
 document.getElementById('homeModalClose').addEventListener('click', closeHomeEditor);   // backdrop click
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('homeModal').hidden) closeHomeEditor(); });
+document.getElementById('homeInput').addEventListener('input', syncHomeInputClear);
+document.getElementById('homeInputClear').addEventListener('click', () => { const inp = document.getElementById('homeInput'); inp.value = ''; syncHomeInputClear(); inp.focus(); });
 document.getElementById('homeEditForm').addEventListener('submit', e => { e.preventDefault(); submitHome(document.getElementById('homeInput').value); });
 
 /* ===================== boot ===================== */

@@ -164,17 +164,15 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 /* Leaflet's default popup fade is opacity 0->1 over 0.2s linear, which on hover
    reads as a "gap" before the card appears. Snap it in so hover feels instant. */
 .leaflet-fade-anim .leaflet-popup{transition:opacity .08s ease-out}
-/* Desktop hover popups are purely informational — they close the instant the
-   cursor leaves the pin, so NOTHING in the popup may capture the mouse. The popup
-   opens above the pin and its downward TIP overlaps the top of the chip; Leaflet's
-   own CSS sets the tip to pointer-events:auto (an explicit value that overrides our
-   inherited none), so the tip sat over the chip's title/gap area and stole the
-   hover → mouseleave → close → reopen → flicker. Force every popup part (incl. the
-   tip + tip-container) to none. Touch keeps them interactive (tap, Navigate, ✕). */
-.leaflet-popup,.leaflet-popup-content-wrapper,.leaflet-popup-tip-container,.leaflet-popup-tip{pointer-events:none!important}
+/* The popup CARD is interactive: the JS hover-bridge keeps it open while the
+   cursor travels onto it, and NAVIGATE must be clickable. But the downward TIP
+   overlaps the top of the chip, and Leaflet's own CSS makes it pointer-events:auto;
+   if left interactive it sits over the chip and steals the hover (→ flicker). So
+   the tip + its container + the outer popup box stay non-interactive; only the
+   card captures the mouse. */
+.leaflet-popup,.leaflet-popup-tip-container,.leaflet-popup-tip{pointer-events:none!important}
 .leaflet-popup{margin-bottom:6px}
-.leaflet-popup-content-wrapper{background:#fff;color:var(--txt);border:1px solid var(--line-bright);border-radius:13px;box-shadow:0 14px 40px rgba(40,42,48,.22)}
-body.is-touch .leaflet-popup,body.is-touch .leaflet-popup-content-wrapper,body.is-touch .leaflet-popup-tip-container,body.is-touch .leaflet-popup-tip{pointer-events:auto!important}
+.leaflet-popup-content-wrapper{background:#fff;color:var(--txt);border:1px solid var(--line-bright);border-radius:13px;box-shadow:0 14px 40px rgba(40,42,48,.22);pointer-events:auto!important}
 .leaflet-popup-tip{background:#fff;border:1px solid var(--line-bright)}
 .leaflet-popup-content{margin:14px 15px}
 .leaflet-popup-close-button{color:var(--muted)!important;font-size:18px!important;padding:9px 9px 0 0!important}

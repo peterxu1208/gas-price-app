@@ -330,18 +330,23 @@ function drawMarkers() {
       // touch devices have no hover state: tap a pin opens it, tapping elsewhere/the map closes it
       m.on('click', (ev) => { L.DomEvent.stopPropagation(ev); map.closePopup(); m.openPopup(); });
     } else {
-      // Robust hover: bind mouseenter/mouseleave to the visible chip itself.
-      // Unlike Leaflet's marker mouseover/mouseout (which bubble and refire on
-      // every child/popup/stacking change — causing the popup to flicker or get
-      // stuck closed), these fire only when the pointer truly crosses the chip's
-      // border and ignore the popup that opens above it.
+      // Hover: dwell-to-open + grace-to-close bridge (see helpers below). Bound to
+      // the visible chip; the popup card cancels the close on enter so it stays
+      // reachable (read it / click NAVIGATE) and clustered pins don't strobe.
       m.on('add', () => {
         const chip = m.getElement() && m.getElement().querySelector('.ptag');
         if (!chip) return;
-        chip.addEventListener('mouseenter', () => { console.log('[BUG]', (performance.now()|0), 'hover.enter', s.id); m.openPopup(); });
-        chip.addEventListener('mouseleave', () => { console.log('[BUG]', (performance.now()|0), 'hover.leave', s.id); m.closePopup(); });
+        chip.addEventListener('mouseenter', () => scheduleHoverOpen(m));
+        chip.addEventListener('mouseleave', () => { cancelHoverOpen(); scheduleClose(); });
       });
-      pop.on('add', () => applyLogoFallbacks(pop.getElement()));
+      pop.on('add', () => {
+        applyLogoFallbacks(pop.getElement());
+        const card = pop.getElement() && pop.getElement().querySelector('.leaflet-popup-content-wrapper');
+        if (card) {
+          card.addEventListener('mouseenter', cancelPendingClose);
+          card.addEventListener('mouseleave', scheduleClose);
+        }
+      });
     }
     m.addTo(markerLayer); markerById[s.id] = m;
   });
@@ -368,13 +373,23 @@ function renderMarkers() {
   fadeTimer = setTimeout(drawMarkers, 65);
 }
 
-/* ---- hover bridge: gives the cursor a grace window to travel from the pin to the popup card
-   (e.g. to reach the Navigate button) without the popup closing out from under it ---- */
-let closeTimer = null;
+/* ---- hover card interaction (dwell-to-open + grace-to-close bridge) ----
+   Open only after a short dwell, so quick fly-bys over clustered pins don't strobe
+   the popup. Once open, a grace window lets the cursor travel from the pin onto the
+   popup card (to read it / click NAVIGATE) without it closing: entering the card
+   cancels the pending close, leaving both the pin and the card schedules it. */
+const HOVER_OPEN_MS = 130, HOVER_CLOSE_MS = 260;
+let hoverOpenTimer = null, closeTimer = null, hoverMarker = null;
+function cancelHoverOpen() { clearTimeout(hoverOpenTimer); hoverOpenTimer = null; }
 function cancelPendingClose() { clearTimeout(closeTimer); closeTimer = null; }
-function scheduleClose(m) {
+function scheduleHoverOpen(m) {
   cancelPendingClose();
-  closeTimer = setTimeout(() => { m.closePopup(); }, 220);
+  cancelHoverOpen();
+  hoverOpenTimer = setTimeout(() => { hoverMarker = m; m.openPopup(); }, HOVER_OPEN_MS);
+}
+function scheduleClose() {
+  cancelPendingClose();
+  closeTimer = setTimeout(() => { if (hoverMarker) hoverMarker.closePopup(); }, HOVER_CLOSE_MS);
 }
 
 map.on('popupopen', e => {
@@ -393,7 +408,7 @@ function makeEdgeChip() {
   el.style.transform = 'translate(-50%,-50%)';
   el.innerHTML = '<svg class="arrow" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2L4.5 20l7.5-4.2L19.5 20z"/></svg><span class="ec-val"></span>';
   const rec = { el, arrow: el.querySelector('.arrow'), val: el.querySelector('.ec-val'), station: null };
-  el.addEventListener('click', () => { console.log('[BUG]', (performance.now()|0), 'edgeChip.click', rec.station && rec.station.id); if (rec.station) setActiveFromEdge(rec.station); });
+  el.addEventListener('click', () => { if (rec.station) setActiveFromEdge(rec.station); });
   return rec;
 }
 
@@ -440,7 +455,6 @@ function updateEdgeIndicators() {
 }
 
 function setActiveFromEdge(s) {
-  console.log('[BUG]', (performance.now()|0), 'setActiveFromEdge -> flyTo', s.id);
   map.flyTo([s.lat, s.lng], Math.max(map.getZoom(), 14), { duration: .55 });
   map.once('moveend', () => {
     const mk = markerById[s.id];
@@ -456,8 +470,6 @@ function scheduleEdgeUpdate() {
   edgeRaf = requestAnimationFrame(() => { edgeRaf = null; updateEdgeIndicators(); });
 }
 map.on('move zoom moveend zoomend resize', scheduleEdgeUpdate);
-// TEMP: log every map-move start with a stack trace so we can see what initiated it.
-map.on('movestart zoomstart', (e) => { console.log('[BUG]', (performance.now()|0), 'map.' + e.type); console.trace('[BUG] move origin'); });
 
 /* ===================== controls ===================== */
 function bindSeg(id, key) {
@@ -506,7 +518,6 @@ function updateFreshness() {
 
 /* ---- swap the active station set + origin, then redraw and re-frame ---- */
 function setActiveSet(stations, newOrigin, { frame = true } = {}) {
-  console.log('[BUG]', (performance.now()|0), 'setActiveSet', stations.length, newOrigin && newOrigin.label, 'frame=' + frame);
   DATA = stations;
   origin = newOrigin;
   renderBrandFilter(true);      // rebuild brand checkboxes for the new area (majors on, Other off)
@@ -565,7 +576,6 @@ async function runSearch(query) {
 
 /* ---- home: restore the original 7 and the deliberate home-centering recenter ---- */
 function goHome() {
-  console.log('[BUG]', (performance.now()|0), 'goHome');
   document.getElementById('searchInput').value = '';
   setActiveSet(HOME_STATIONS, { lat: HOME.lat, lng: HOME.lng, label: 'Hope Ave', fullLabel: '60 Hope Ave, Waltham, MA', isHome: true }, { frame: false });
   // find the zoom that fits everything, but center HOME (not the bounds midpoint),

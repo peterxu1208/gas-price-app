@@ -402,7 +402,14 @@ function renderMarkers() {
    the popup. Once open, a grace window lets the cursor travel from the pin onto the
    popup card (to read it / click NAVIGATE) without it closing: entering the card
    cancels the pending close, leaving both the pin and the card schedules it. */
-const HOVER_OPEN_MS = 130, HOVER_CLOSE_MS = 260;
+// Snappier on desktop: shorter dwell so the card appears promptly, shorter grace
+// so it doesn't visibly linger after the cursor leaves. Kept non-zero so a fast
+// fly-by across clustered pins still doesn't strobe (a continuous sweep spends
+// <60ms over each pin) and so the cursor can still cross the pin→card gap before
+// close — that gap is only the ~17px tip, so 80ms is enough grace to reach the
+// card (whose mouseenter cancels the pending close). Anti-flicker otherwise comes
+// from structure — geometry-safe hover + non-interactive tip — not timing.
+const HOVER_OPEN_MS = 60, HOVER_CLOSE_MS = 80;
 let hoverOpenTimer = null, closeTimer = null, hoverMarker = null;
 function cancelHoverOpen() { clearTimeout(hoverOpenTimer); hoverOpenTimer = null; }
 function cancelPendingClose() { clearTimeout(closeTimer); closeTimer = null; }

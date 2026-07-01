@@ -223,7 +223,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 /* ---------- leaflet popup ---------- */
 /* Leaflet's default popup fade is opacity 0->1 over 0.2s linear, which on hover
    reads as a "gap" before the card appears. Snap it in so hover feels instant. */
-.leaflet-fade-anim .leaflet-popup{transition:opacity .08s ease-out}
+.leaflet-fade-anim .leaflet-popup{transition:opacity .06s ease-out}
 /* The popup CARD is interactive: the JS hover-bridge keeps it open while the
    cursor travels onto it, and NAVIGATE must be clickable. But the downward TIP
    overlaps the top of the chip, and Leaflet's own CSS makes it pointer-events:auto;

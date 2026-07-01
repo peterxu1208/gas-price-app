@@ -105,7 +105,16 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .home-cancel:hover{color:var(--txt);border-color:var(--line-bright)}
 
 /* ---------- location search ---------- */
-.searchrow{overflow:visible;gap:8px;background:#efece5;border:1px solid var(--line);border-radius:9px;padding:0 8px;height:34px}
+/* Was #efece5 on a var(--line) border — ~1.1:1 contrast against its own border
+   and ~1.02:1 against the map basemap it now floats directly over (measured via
+   WCAG relative luminance), since that muted fill was designed to sit on a white
+   card, not straight on the map. Matches the other standalone floating pills
+   (.home-chip/.home-edit): frosted white + box-shadow + --line-bright border —
+   box-shadow is what actually gives those their visible edge, not the border alone. */
+.searchrow{overflow:visible;gap:8px;background:rgba(255,255,255,.92);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--line-bright);border-radius:9px;padding:0 8px;height:34px;
+  box-shadow:var(--shadow)}
 .searchrow.busy{opacity:.7}
 .search-ic{width:14px;height:14px;flex:none;color:var(--muted-2)}
 #searchInput{flex:1 1 auto;min-width:0;height:100%;border:0;background:transparent;outline:none;

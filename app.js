@@ -299,22 +299,6 @@ function renderOrigin() {
 const markerLayer = L.layerGroup().addTo(map);
 const markerById = {};
 
-// When a popup is open, hide every OTHER pin — not just around the close button,
-// the whole card. In dense clusters a neighboring pin's price chip can otherwise
-// sit right behind the popup (most visibly behind the close button, since that's
-// a small transparent glyph with nothing of its own to block what's underneath).
-// Hooked at the map level (not at each open/close call site) so it covers every
-// way a popup can close, including its own close button, tapping the map, and
-// switching between markers — not just our own openPopup()/closePopup() calls.
-map.on('popupopen', e => {
-  const src = e.popup._source;
-  const activePin = src && src.getElement && src.getElement() && src.getElement().querySelector('.pin');
-  document.querySelectorAll('#map .pin').forEach(el => el.classList.toggle('dim-for-popup', el !== activePin));
-});
-map.on('popupclose', () => {
-  document.querySelectorAll('#map .pin.dim-for-popup').forEach(el => el.classList.remove('dim-for-popup'));
-});
-
 function popupHTML(s) {
   const a = ageInfo(updOf(s, state.grade));
   const grades = GORD.map(g => { const v = priceOf(s, g); return `<div class="gc ${g === state.grade ? 'act' : ''}"><div class="g">${GLAB[g]}</div><div class="v ${v == null ? 'none' : ''}">${v == null ? 'N/A' : '$' + v.toFixed(2)}</div></div>`; }).join('');

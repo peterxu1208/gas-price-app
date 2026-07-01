@@ -193,10 +193,6 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
    blur) for a smooth settle; per-pin stagger is set inline in drawMarkers(). */
 .pin.fade-in{opacity:0;transform:translateY(7px) scale(.9)}
 .pin.fade-in.show{opacity:1;transform:translateY(0) scale(1)}
-/* While a popup is open, every OTHER pin hides — guarantees nothing (a chip, a
-   crown badge, anything) can ever visually sit behind the open popup or its
-   close button, regardless of how tightly clustered nearby stations are. */
-.pin.dim-for-popup{opacity:0!important;pointer-events:none!important}
 .ptag{display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:#fff;border:1.5px solid var(--brand,var(--line-bright));
   border-radius:9px;padding:8px 9px 5px;font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;color:var(--txt);
   box-shadow:0 5px 14px rgba(40,42,48,.22);white-space:nowrap;transition:box-shadow .14s ease}

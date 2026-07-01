@@ -258,11 +258,16 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
    running off-screen when it no longer fits beside the card.
    Desktop rules above are untouched. ============================ */
 @media (max-width:640px){
+  /* padding-top is small but NOT zero: the card's box-shadow has a downward
+     offset, so it bleeds outward on the left/right/bottom but has nowhere to
+     render above a box sitting at literal y:0 — the screen edge clips it before
+     our CSS even gets a say. That's what still read as a raw/unfinished top
+     edge even after adding the border back. A few px of clearance lets the
+     same shadow show above the card too, matching the finish on every other
+     side, while staying visually snapped to the top. */
   .topbar{position:absolute;top:0;left:0;right:0;display:flex;flex-direction:column;
-    align-items:stretch;gap:6px;padding:0 8px;max-width:100%}
-  /* Flush to the top edge (no gap, no top rounding) but keeps the top BORDER —
-     without it the card had a raw, unfinished-looking cut edge at the very top. */
-  .topcard{width:100%;border-radius:0 0 14px 14px;padding:9px 11px 10px;
+    align-items:stretch;gap:6px;padding:8px 8px 0;max-width:100%}
+  .topcard{width:100%;border-radius:14px;padding:9px 11px 10px;
     display:grid;grid-template-columns:1fr auto;column-gap:8px;row-gap:6px;
     grid-template-areas:"search search" "title grade" "brand brand"}
   .searchrow{grid-area:search}

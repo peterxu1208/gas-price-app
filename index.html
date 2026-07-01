@@ -18,27 +18,29 @@
 </button>
 
 <div class="topbar">
-  <div class="topcard">
+  <div class="topstack">
     <form class="trow searchrow" id="searchForm" autocomplete="off" role="search">
       <svg class="search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <input id="searchInput" type="text" placeholder="Search a location…" aria-label="Search a location" enterkeyhint="search">
       <button type="button" id="searchClear" class="search-clear" title="Clear search" aria-label="Clear search" hidden>✕</button>
     </form>
-    <div class="trow toprow">
-      <div class="ttl">
-        <h1 id="locName">Hope Ave</h1>
+    <div class="topcard">
+      <div class="trow toprow">
+        <div class="ttl">
+          <h1 id="locName">Hope Ave</h1>
+        </div>
+        <span class="stamp"><span class="live-dot"></span><span id="syncStamp">checking data…</span></span>
       </div>
-      <span class="stamp"><span class="live-dot"></span><span id="syncStamp">checking data…</span></span>
-    </div>
-    <div class="trow graderow">
-      <div class="seg" id="gradeSeg">
-        <button data-grade="REGULAR_UNLEADED">Reg</button>
-        <button data-grade="MIDGRADE">Mid</button>
-        <button class="on" data-grade="PREMIUM">Prem</button>
+      <div class="trow graderow">
+        <div class="seg" id="gradeSeg">
+          <button data-grade="REGULAR_UNLEADED">Reg</button>
+          <button data-grade="MIDGRADE">Mid</button>
+          <button class="on" data-grade="PREMIUM">Prem</button>
+        </div>
       </div>
-    </div>
-    <div class="trow brandrow">
-      <div class="brandfilter" id="brandFilter"></div>
+      <div class="trow brandrow">
+        <div class="brandfilter" id="brandFilter"></div>
+      </div>
     </div>
   </div>
   <div class="home-float" id="homeFloat">

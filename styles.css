@@ -52,9 +52,14 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
    and the whole thing still shrink-wraps its content at top-left. */
 .topbar{position:absolute;top:0;left:0;z-index:1000;padding:14px;pointer-events:none;
   display:inline-flex;align-items:flex-start;gap:8px;max-width:calc(100% - 28px)}
+/* .topstack holds the search bar ABOVE the card, outside its border — the search
+   pill already has its own background/border (see .searchrow), so it doesn't need
+   the card's white/bordered wrapper. topstack (not .topcard) now owns the shared
+   width, so both the standalone search bar and the card below line up. */
+.topstack{pointer-events:auto;display:flex;flex-direction:column;gap:8px;width:300px;max-width:100%}
 .topcard{pointer-events:auto;background:rgba(255,255,255,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   border:1px solid var(--line-bright);border-radius:15px;padding:11px 13px;box-shadow:var(--shadow);
-  display:flex;flex-direction:column;gap:9px;width:300px;max-width:100%}
+  display:flex;flex-direction:column;gap:9px;max-width:100%}
 
 /* ---------- home control (a compact pill beside the toolbar) ---------- */
 .home-float{pointer-events:auto;display:flex;align-items:center;gap:6px}
@@ -267,17 +272,20 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
      side, while staying visually snapped to the top. */
   .topbar{position:absolute;top:0;left:0;right:0;display:flex;flex-direction:column;
     align-items:stretch;gap:6px;padding:8px 8px 0;max-width:100%}
+  /* Search bar is a sibling of .topcard now (outside its border), so topstack —
+     not the card — owns the full-width stretch, with the same 12px gap that
+     separates the card's own internal rows. */
+  .topstack{width:100%;gap:12px}
   /* minmax(0,1fr), not bare 1fr: a bare 1fr track has an implicit min-width
      equal to its widest item's un-wrapped content size — and the brand row
      (nowrap + overflow-x:auto, by design) is naturally very wide, which was
-     forcing this ENTIRE column — search/title/grade too — out to that width,
+     forcing this ENTIRE column — title/grade too — out to that width,
      well past the card's real 352px, with everything past the card's edge
      just invisibly clipped. minmax(0,…) lets the track actually shrink so
      overflow-x:auto on the brand row does its job instead. */
   .topcard{width:100%;border-radius:14px;padding:9px 11px 10px;
     display:grid;grid-template-columns:minmax(0,1fr);row-gap:12px;
-    grid-template-areas:"search" "title" "grade" "brand"}
-  .searchrow{grid-area:search}
+    grid-template-areas:"title" "grade" "brand"}
   /* Address + freshness share one row (title's own full-width row now that it
      no longer splits space with the grade buttons); grade drops to its own
      full-width row below, so each of its 3 buttons gets real tap-target size

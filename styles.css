@@ -271,7 +271,17 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
     display:grid;grid-template-columns:1fr auto;column-gap:8px;row-gap:6px;
     grid-template-areas:"search search" "title grade" "brand brand"}
   .searchrow{grid-area:search}
-  .toprow{grid-area:title;border-bottom:0;padding-bottom:0;align-items:center;overflow:visible}
+  /* Freshness stacks BELOW the address instead of sharing its row — on mobile
+     that row was splitting its width between the address text, the "updated
+     Xh ago" stamp, AND the grade buttons, so the address truncated hard even
+     when there was room to spare once the stamp moved out of its way. */
+  /* .trow.toprow (not just .toprow) to match the base rule's specificity —
+     the base desktop rule sets align-items:flex-start on that same two-class
+     selector, which otherwise wins over a lower-specificity mobile override
+     regardless of media-query source order. We need align-items:stretch here
+     so .ttl fills the row's full width (its ellipsis truncation needs real
+     room to work with, not just its own text's shrink-wrapped width). */
+  .trow.toprow{grid-area:title;border-bottom:0;padding-bottom:0;flex-direction:column;align-items:stretch;gap:1px;overflow:visible}
   .ttl h1{font-size:13px;font-weight:600;-webkit-line-clamp:1}
   .stamp{font-size:8.5px}
   .graderow{grid-area:grade;align-self:center}

@@ -309,6 +309,29 @@ function popupHTML(s) {
     <a class="nav" href="${s.mapsUrl}" target="_blank" rel="noopener">NAVIGATE →</a></div>`;
 }
 
+// On mobile, tapping a pin re-centers the map so the open popup lands in the
+// middle of the space BELOW the toolbar — not wherever it happens to fall
+// otherwise, which was landing right under/behind the toolbar. Desktop hover is
+// untouched: re-centering the map on every hover would be disruptive for a mouse
+// user, so this only runs for the tap-to-open (IS_TOUCH) path, and only at
+// mobile widths (matches the toolbar's own @media(max-width:640px) breakpoint).
+function centerPopupOnMobile(marker) {
+  if (!window.matchMedia('(max-width:640px)').matches) return;
+  requestAnimationFrame(() => {
+    const pop = marker.getPopup();
+    const el = pop && pop.getElement();
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const toolbar = document.querySelector('.topbar');
+    const topInset = toolbar ? toolbar.getBoundingClientRect().bottom : 0;
+    const targetCenterX = window.innerWidth / 2;
+    const targetCenterY = (topInset + window.innerHeight) / 2;
+    const dx = (rect.left + rect.width / 2) - targetCenterX;
+    const dy = (rect.top + rect.height / 2) - targetCenterY;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) map.panBy([dx, dy], { animate: true });
+  });
+}
+
 function drawMarkers() {
   markerLayer.clearLayers();
   for (const k in markerById) delete markerById[k];   // drop refs to the previous set
@@ -329,7 +352,7 @@ function drawMarkers() {
     m.bindPopup(pop);
     if (IS_TOUCH) {
       // touch devices have no hover state: tap a pin opens it, tapping elsewhere/the map closes it
-      m.on('click', (ev) => { L.DomEvent.stopPropagation(ev); map.closePopup(); m.openPopup(); });
+      m.on('click', (ev) => { L.DomEvent.stopPropagation(ev); map.closePopup(); m.openPopup(); centerPopupOnMobile(m); });
     } else {
       // Hover: dwell-to-open + grace-to-close bridge (see helpers below). Bound to
       // the visible chip; the popup card cancels the close on enter so it stays

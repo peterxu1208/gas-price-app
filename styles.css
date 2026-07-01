@@ -221,7 +221,12 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .leaflet-popup-content-wrapper{background:#fff;color:var(--txt);border:1px solid var(--line-bright);border-radius:13px;box-shadow:0 14px 40px rgba(40,42,48,.22);pointer-events:auto!important}
 .leaflet-popup-tip{background:#fff;border:1px solid var(--line-bright)}
 .leaflet-popup-content{margin:14px 15px}
-.leaflet-popup-close-button{color:var(--muted)!important;font-size:18px!important;padding:9px 9px 0 0!important}
+/* Leaflet appends this as a SIBLING of .leaflet-popup-content-wrapper, both direct
+   children of .leaflet-popup. .leaflet-popup is pointer-events:none (so hover can
+   pass through to the map) and we only re-enable it on the content wrapper — the
+   close button inherits `none` from .leaflet-popup and was never re-enabled, so on
+   touch (where this button is the only close affordance) it silently did nothing. */
+.leaflet-popup-close-button{color:var(--muted)!important;font-size:18px!important;padding:9px 9px 0 0!important;pointer-events:auto!important}
 .pop .ph{display:flex;align-items:center;gap:8px;margin-bottom:3px}
 .pop .ph .dot{width:9px;height:9px;border-radius:50%}
 .pop .ph .dot.shell{background:var(--shell)} .pop .ph .dot.mobil{background:var(--mobil)}
@@ -242,3 +247,39 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .pop a.nav{display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;
   color:#fff;background:var(--fresh);border-radius:8px;padding:9px;transition:filter .15s;box-shadow:0 3px 10px rgba(15,155,84,.25)}
 .pop a.nav:hover{filter:brightness(1.06)}
+
+/* ============================================================
+   MOBILE LAYOUT (narrow screens) — same components as desktop,
+   rearranged only. Toolbar snaps flush to the top edge as a slim
+   bar (title + grade share one row instead of stacking, brand
+   chips become one swipeable row instead of wrapping across many),
+   and the home group drops out of the toolbar's row into its own
+   compact pill below it — this is what stops the gear button from
+   running off-screen when it no longer fits beside the card.
+   Desktop rules above are untouched. ============================ */
+@media (max-width:640px){
+  .topbar{position:absolute;top:0;left:0;right:0;display:flex;flex-direction:column;
+    align-items:stretch;gap:6px;padding:0 8px;max-width:100%}
+  .topcard{width:100%;border-radius:0 0 14px 14px;border-width:0 1px 1px 1px;padding:9px 11px 10px;
+    display:grid;grid-template-columns:1fr auto;column-gap:8px;row-gap:6px;
+    grid-template-areas:"search search" "title grade" "brand brand"}
+  .searchrow{grid-area:search}
+  .toprow{grid-area:title;border-bottom:0;padding-bottom:0;align-items:center;overflow:visible}
+  .ttl h1{font-size:13px;font-weight:600;-webkit-line-clamp:1}
+  .stamp{font-size:8.5px}
+  .graderow{grid-area:grade;align-self:center}
+  #gradeSeg{width:auto}
+  .seg button{padding:0 6px}
+  .brandrow{grid-area:brand;margin-top:0}
+  /* single swipeable row instead of wrapping across ~5 lines */
+  .brandfilter{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:1px}
+  .brandfilter::-webkit-scrollbar{display:none}
+  .bchk{flex:none}
+
+  .home-float{padding:0 2px}
+  .home-chip,.home-edit{height:28px}
+  .home-chip{padding:0 10px;font-size:10px}
+  .home-edit{width:28px}
+  .home-edit svg{width:13px;height:13px}
+  .home-ic{width:12px;height:12px}
+}

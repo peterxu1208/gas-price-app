@@ -267,26 +267,25 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
      side, while staying visually snapped to the top. */
   .topbar{position:absolute;top:0;left:0;right:0;display:flex;flex-direction:column;
     align-items:stretch;gap:6px;padding:8px 8px 0;max-width:100%}
+  /* minmax(0,1fr), not bare 1fr: a bare 1fr track has an implicit min-width
+     equal to its widest item's un-wrapped content size — and the brand row
+     (nowrap + overflow-x:auto, by design) is naturally very wide, which was
+     forcing this ENTIRE column — search/title/grade too — out to that width,
+     well past the card's real 352px, with everything past the card's edge
+     just invisibly clipped. minmax(0,…) lets the track actually shrink so
+     overflow-x:auto on the brand row does its job instead. */
   .topcard{width:100%;border-radius:14px;padding:9px 11px 10px;
-    display:grid;grid-template-columns:1fr auto;column-gap:8px;row-gap:6px;
-    grid-template-areas:"search search" "title grade" "brand brand"}
+    display:grid;grid-template-columns:minmax(0,1fr);row-gap:6px;
+    grid-template-areas:"search" "title" "grade" "brand"}
   .searchrow{grid-area:search}
-  /* Freshness stacks BELOW the address instead of sharing its row — on mobile
-     that row was splitting its width between the address text, the "updated
-     Xh ago" stamp, AND the grade buttons, so the address truncated hard even
-     when there was room to spare once the stamp moved out of its way. */
-  /* .trow.toprow (not just .toprow) to match the base rule's specificity —
-     the base desktop rule sets align-items:flex-start on that same two-class
-     selector, which otherwise wins over a lower-specificity mobile override
-     regardless of media-query source order. We need align-items:stretch here
-     so .ttl fills the row's full width (its ellipsis truncation needs real
-     room to work with, not just its own text's shrink-wrapped width). */
-  .trow.toprow{grid-area:title;border-bottom:0;padding-bottom:0;flex-direction:column;align-items:stretch;gap:1px;overflow:visible}
+  /* Address + freshness share one row (title's own full-width row now that it
+     no longer splits space with the grade buttons); grade drops to its own
+     full-width row below, so each of its 3 buttons gets real tap-target size
+     instead of being squeezed beside the title text. */
+  .trow.toprow{grid-area:title;border-bottom:0;padding-bottom:0;overflow:visible}
   .ttl h1{font-size:13px;font-weight:600;-webkit-line-clamp:1}
   .stamp{font-size:8.5px}
-  .graderow{grid-area:grade;align-self:center}
-  #gradeSeg{width:auto}
-  .seg button{padding:0 6px}
+  .graderow{grid-area:grade}
   .brandrow{grid-area:brand;margin-top:0}
   /* single swipeable row instead of wrapping across ~5 lines */
   .brandfilter{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:1px}

@@ -52,19 +52,9 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
    and the whole thing still shrink-wraps its content at top-left. */
 .topbar{position:absolute;top:0;left:0;z-index:1000;padding:14px;pointer-events:none;
   display:inline-flex;align-items:flex-start;gap:8px;max-width:calc(100% - 28px)}
-.topcard{pointer-events:auto;position:relative;isolation:isolate;
-  border-radius:15px;padding:12px 14px;box-shadow:var(--shadow);
+.topcard{pointer-events:auto;background:rgba(255,255,255,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--line-bright);border-radius:15px;padding:11px 13px;box-shadow:var(--shadow);
   display:flex;flex-direction:column;gap:9px;width:300px;max-width:100%}
-/* The frosted surface (translucent bg + blur + 1px ring) lives on this pseudo-layer,
-   NOT on .topcard itself. Keeping the backdrop-filter on the SAME node as the
-   box-shadow is what makes Chromium render a 1px "beak" spur at a corner (a
-   shadow-vs-blur rasterization bug whose visibility varies by display scaling).
-   Isolating the blur on its own rounded layer, with only the drop-shadow left on
-   .topcard, removes that interaction on every device. The 1px edge is an inset
-   ring (no real border → no corner AA seam either). */
-.topcard::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;
-  background:rgba(255,255,255,.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-  box-shadow:inset 0 0 0 1px var(--line-bright)}
 
 /* ---------- home control (a compact pill beside the toolbar) ---------- */
 .home-float{pointer-events:auto;display:flex;align-items:center;gap:6px}

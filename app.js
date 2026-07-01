@@ -197,7 +197,10 @@ function renderBrandFilter(reset) {
 }
 
 /* ===================== map init ===================== */
-const map = L.map('map', { zoomControl: true, attributionControl: true }).setView([42.3795, -71.238], 13);
+// zoomControl:false — the default +/- buttons sit top-left, fully hidden behind the
+// toolbar card (only their corner poked out past its rounded edge, looking like a
+// stray "beak"). Zoom still works via scroll / pinch / double-click.
+const map = L.map('map', { zoomControl: false, attributionControl: true }).setView([42.3795, -71.238], 13);
 const IS_TOUCH = window.matchMedia('(hover: none), (pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 document.body.classList.toggle('is-touch', IS_TOUCH);   // CSS uses this to keep popups tappable on touch only
 if (IS_TOUCH) map.on('click', () => map.closePopup());   // tapping empty map closes the open card

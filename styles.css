@@ -260,7 +260,9 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 @media (max-width:640px){
   .topbar{position:absolute;top:0;left:0;right:0;display:flex;flex-direction:column;
     align-items:stretch;gap:6px;padding:0 8px;max-width:100%}
-  .topcard{width:100%;border-radius:0 0 14px 14px;border-width:0 1px 1px 1px;padding:9px 11px 10px;
+  /* Flush to the top edge (no gap, no top rounding) but keeps the top BORDER —
+     without it the card had a raw, unfinished-looking cut edge at the very top. */
+  .topcard{width:100%;border-radius:0 0 14px 14px;padding:9px 11px 10px;
     display:grid;grid-template-columns:1fr auto;column-gap:8px;row-gap:6px;
     grid-template-areas:"search search" "title grade" "brand brand"}
   .searchrow{grid-area:search}

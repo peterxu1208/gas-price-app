@@ -340,14 +340,22 @@ function centerPopupOnMobile(marker, targetZoom) {
     const v = popC.subtract(map.latLngToContainerPoint(marker.getLatLng()));  // marker → popup center
     const markerDst = safeC.subtract(v);                                      // where the marker must land
     const centerPt = map.project(marker.getLatLng(), z).subtract(markerDst.subtract(map.getSize().divideBy(2)));
-    // Pacing modeled on Google Maps' camera: Leaflet's default flight duration is
-    // distance×0.8s, so short recenters blink by in ~0.25s. Google gives even a
-    // short hop a relaxed beat and lets long/zooming flights stretch, capped so
-    // nothing drags. Floor 0.8s; + screen-distance; + per-zoom-level beat; cap 1.6s.
-    // (flyTo's built-in ease-out — fast start, soft landing — matches Google's feel.)
-    const dz = Math.abs(z - map.getZoom());
-    const dur = Math.min(1.6, 0.8 + popC.distanceTo(safeC) / 2000 + dz * 0.25);
-    map.flyTo(map.unproject(centerPt, z), z, { duration: dur });
+    const target = map.unproject(centerPt, z);
+    const distPx = popC.distanceTo(safeC);
+    if (z === map.getZoom()) {
+      // Same-zoom, on-screen hop → FLAT PAN, like Google Maps' short recenter.
+      // flyTo's van-Wijk arc dips the zoom mid-flight even when start==end zoom
+      // (measured: 13 → 12.989 → 13 on a 98px hop), so every frame renders at a
+      // fractional zoom — tiles rescale and pin/popup positions re-round per
+      // frame, which shows up as screen shake. panTo is one GPU translate of the
+      // map pane: nothing rescales, nothing shakes. Short distance-scaled beat.
+      map.panTo(target, { duration: Math.min(0.8, 0.4 + distPx / 1500), easeLinearity: 0.25 });
+    } else {
+      // Zoom-changing flight (edge chips) → keep the Google-style arc. Pacing:
+      // relaxed floor + screen-distance + a beat per zoom level, capped at 1.6s.
+      const dz = Math.abs(z - map.getZoom());
+      map.flyTo(target, z, { duration: Math.min(1.6, 0.8 + distPx / 2000 + dz * 0.25) });
+    }
   });
 }
 

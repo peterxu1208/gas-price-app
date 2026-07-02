@@ -37,7 +37,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .leaflet-control-zoom a{background:#fff!important;color:var(--txt)!important;border-color:var(--line)!important}
 .leaflet-control-zoom a:hover{background:#f7f6f2!important;color:var(--fresh)!important}
 
-.locate-btn{position:absolute;right:14px;bottom:14px;z-index:1000;width:42px;height:42px;border-radius:50%;
+.locate-btn{position:absolute;right:14px;bottom:14px;z-index:1002;width:42px;height:42px;border-radius:50%;
   background:#fff;border:1px solid var(--line-bright);box-shadow:var(--shadow);
   display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;color:var(--txt)}
 .locate-btn:hover{color:var(--fresh);border-color:var(--fresh)}
@@ -45,7 +45,11 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .locate-btn svg{width:20px;height:20px}
 
 /* ---------- off-screen station indicators ---------- */
-#edgeIndicators{position:absolute;inset:0;z-index:999;pointer-events:none}
+/* z 1001 > toolbar (1000): a chip for a pin hidden BEHIND the toolbar parks at
+   the pin's own position, on top of the bar (app.js only allows chips onto the
+   toolbar in that case — regular off-screen chips are kept off it). The locate
+   button + map badge sit at 1002 so chips never cover them. */
+#edgeIndicators{position:absolute;inset:0;z-index:1001;pointer-events:none}
 .edge-chip{position:absolute;pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:5px;
   background:#fff;border:1.5px solid var(--brand,var(--line-bright));border-radius:20px;padding:5px 9px 5px 7px;
   font-family:'Poppins',sans-serif;font-weight:700;font-size:var(--fs-sm);color:var(--txt);
@@ -61,7 +65,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .maplabel.river{color:#7fa6c4}
 .ishield{font-family:'Poppins',sans-serif;font-size:8px;font-weight:700;color:#8a7430;background:#f6e6bd;border:1px solid var(--hwy-edge);
   border-radius:4px;padding:1px 5px;letter-spacing:.05em;pointer-events:none}
-.mapbadge{position:absolute;left:50%;bottom:172px;transform:translateX(-50%);z-index:1001;
+.mapbadge{position:absolute;left:50%;bottom:172px;transform:translateX(-50%);z-index:1002;
   background:rgba(255,255,255,.93);border:1px solid var(--line-bright);border-radius:9px;padding:7px 12px;
   font-family:'Poppins',sans-serif;font-size:9px;letter-spacing:.03em;color:var(--muted);
   box-shadow:var(--shadow);max-width:88%;text-align:center;line-height:1.55}

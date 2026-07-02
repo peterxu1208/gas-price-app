@@ -24,9 +24,18 @@ const { NOW, HOME } = window.FuelData;
 let DATA = [];
 let origin = { lat: HOME.lat, lng: HOME.lng, label: 'Hope Ave', fullLabel: '60 Hope Ave, Waltham, MA', isHome: true };
 
-// Padding (px) reserved for the floating toolbar card when framing the map and
-// placing off-screen chips. Card is taller now (search row), so top is larger.
+// Padding (px) reserved for the floating toolbar card when framing the map.
+// `top` is a fixed compromise for DESKTOP (card only covers the top-left);
+// on mobile the toolbar spans the full width and its real height varies, so
+// framing measures it live via framePadTop() instead.
 const PAD = { top: 150, bottom: 40, side: 36 };
+function framePadTop() {
+  if (window.matchMedia('(max-width:640px)').matches) {
+    const st = document.querySelector('.topstack');
+    if (st) return Math.round(st.getBoundingClientRect().bottom) + 10;
+  }
+  return PAD.top;
+}
 
 const GLAB = { REGULAR_UNLEADED: 'Reg', MIDGRADE: 'Mid', PREMIUM: 'Prem', DIESEL: 'Dies' };
 const GFULL = { REGULAR_UNLEADED: 'Regular', MIDGRADE: 'Midgrade', PREMIUM: 'Premium', DIESEL: 'Diesel' };
@@ -474,8 +483,25 @@ map.on('popupclose', e => {
 });
 
 /* ===================== off-screen station indicators ===================== */
-// Safe viewport box, inset from the toolbar (top) and screen edges, matching the padding used elsewhere.
-const EDGE_INSET = { top: PAD.top, bottom: PAD.bottom, left: PAD.side, right: PAD.side, margin: 14 };
+// Safe viewport box for edge chips: hug the REAL screen edges (small margin).
+// The floating toolbar is NOT a full-width inset — on desktop it only covers the
+// top-left, so a global 150px top inset left chips dangling on an invisible line
+// with empty map above them. Instead the toolbar (and home group) are treated as
+// occluder RECTANGLES, measured each update: a station whose pin sits behind one
+// counts as off-screen (you can't see it) and gets a chip, and any chip that
+// would land under one is dropped to just below it. On mobile the toolbar spans
+// the full width, so this also fixes stations hidden under it having no chip.
+const EDGE_INSET = { top: 12, bottom: PAD.bottom, left: 12, right: 12 };
+function chipOccluders() {
+  const rects = [];
+  for (const sel of ['.topstack', '.home-float']) {
+    const el = document.querySelector(sel);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width && r.height) rects.push(r);
+  }
+  return rects;
+}
 const edgeLayer = document.getElementById('edgeIndicators');
 const edgeChips = new Map();   // station id -> { el, arrow, val, station } reusable chip
 
@@ -494,25 +520,43 @@ function updateEdgeIndicators() {
   const size = map.getSize();
   const box = { left: EDGE_INSET.left, top: EDGE_INSET.top, right: size.x - EDGE_INSET.right, bottom: size.y - EDGE_INSET.bottom };
   const cx = (box.left + box.right) / 2, cy = (box.top + box.bottom) / 2;
+  const occ = chipOccluders();
   const best = cheapest();
   const seen = new Set();
 
   visible().forEach(s => {
     const pt = map.latLngToContainerPoint([s.lat, s.lng]);
-    if (pt.x >= box.left && pt.x <= box.right && pt.y >= box.top && pt.y <= box.bottom) return;  // on-screen: no chip
-    // direction from view-box center to the off-screen point, clamped to the box edge
-    const dx = pt.x - cx, dy = pt.y - cy;
-    const angle = Math.atan2(dy, dx);
-    // clamp the chip position to just inside the box edge, along that angle
-    const scaleX = (box.right - box.left) / 2 - 18, scaleY = (box.bottom - box.top) / 2 - 18;
-    const t = Math.min(scaleX / Math.max(Math.abs(Math.cos(angle)), 1e-6), scaleY / Math.max(Math.abs(Math.sin(angle)), 1e-6));
-    let cxp = cx + Math.cos(angle) * t, cyp = cy + Math.sin(angle) * t;
-    cxp = Math.max(box.left + 10, Math.min(box.right - 10, cxp));
-    cyp = Math.max(box.top + 10, Math.min(box.bottom - 10, cyp));
+    const inBox = pt.x >= box.left && pt.x <= box.right && pt.y >= box.top && pt.y <= box.bottom;
+    const behindUi = occ.some(r => pt.x >= r.left && pt.x <= r.right && pt.y >= r.top && pt.y <= r.bottom);
+    if (inBox && !behindUi) return;  // genuinely visible: no chip
+    let cxp, cyp;
+    if (inBox) {
+      // Pin is on-screen but hidden BEHIND the toolbar/home group: park the chip
+      // at the station's own x (the occluder push below drops it under the bar),
+      // so it hangs directly beneath the hidden pin instead of flying to an edge.
+      cxp = Math.max(box.left + 10, Math.min(box.right - 10, pt.x));
+      cyp = pt.y;
+    } else {
+      // direction from view-box center to the off-screen point, clamped to the box edge
+      const angle = Math.atan2(pt.y - cy, pt.x - cx);
+      const scaleX = (box.right - box.left) / 2 - 18, scaleY = (box.bottom - box.top) / 2 - 18;
+      const t = Math.min(scaleX / Math.max(Math.abs(Math.cos(angle)), 1e-6), scaleY / Math.max(Math.abs(Math.sin(angle)), 1e-6));
+      cxp = cx + Math.cos(angle) * t; cyp = cy + Math.sin(angle) * t;
+      cxp = Math.max(box.left + 10, Math.min(box.right - 10, cxp));
+      cyp = Math.max(box.top + 10, Math.min(box.bottom - 10, cyp));
+    }
+    // a chip may not sit UNDER the toolbar/home group — drop it just below
+    // (34 ≈ half a chip's width, so partial overlaps are caught too)
+    occ.forEach(r => {
+      if (cxp > r.left - 34 && cxp < r.right + 34 && cyp < r.bottom + 24) cyp = r.bottom + 24;
+    });
+    cyp = Math.min(cyp, box.bottom - 10);
 
     const p = priceOf(s, state.grade);
     const isBest = best && s.id === best.id;
-    const arrowDeg = (angle * 180 / Math.PI) + 90; // point arrow outward toward the station
+    // arrow points from the chip's FINAL position toward the actual station —
+    // exact even after edge clamps / occluder push-downs
+    const arrowDeg = Math.atan2(pt.y - cyp, pt.x - cxp) * 180 / Math.PI + 90;
 
     // reuse this station's chip if it already exists — just reposition/relabel it
     let rec = edgeChips.get(s.id);
@@ -613,7 +657,7 @@ function setActiveSet(stations, newOrigin, { frame = true } = {}) {
   renderOrigin();
   render();                     // crossfade markers + recompute edge chips + freshness stamp
   if (frame) {
-    if (stations.length) map.flyToBounds(currentBounds(), { paddingTopLeft: [PAD.side, PAD.top], paddingBottomRight: [PAD.side, PAD.bottom], duration: .6, maxZoom: 16 });
+    if (stations.length) map.flyToBounds(currentBounds(), { paddingTopLeft: [PAD.side, framePadTop()], paddingBottomRight: [PAD.side, PAD.bottom], duration: .6, maxZoom: 16 });
     else map.flyTo([origin.lat, origin.lng], 14, { duration: .6 });
   }
 }
@@ -812,7 +856,7 @@ async function boot() {
   render();
   applyLogoFallbacks(document);   // catches the static brand buttons (incl. any that already failed)
   // frame everything nicely under the floating toolbar
-  setTimeout(() => { map.invalidateSize(); map.fitBounds(currentBounds(), { paddingTopLeft: [PAD.side, PAD.top], paddingBottomRight: [PAD.side, PAD.bottom] }); updateEdgeIndicators(); }, 140);
+  setTimeout(() => { map.invalidateSize(); map.fitBounds(currentBounds(), { paddingTopLeft: [PAD.side, framePadTop()], paddingBottomRight: [PAD.side, PAD.bottom] }); updateEdgeIndicators(); }, 140);
 }
 boot();
 

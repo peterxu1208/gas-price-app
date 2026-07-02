@@ -328,7 +328,12 @@ function centerPopupOnMobile(marker) {
     const targetCenterY = (topInset + window.innerHeight) / 2;
     const dx = (rect.left + rect.width / 2) - targetCenterX;
     const dy = (rect.top + rect.height / 2) - targetCenterY;
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) map.panBy([dx, dy], { animate: true });
+    // animate:false — this rAF runs BEFORE the popup's first paint, so an instant
+    // pan means the first visible frame already has the popup centered (its own
+    // entrance animation plays in place). An animated pan here painted the popup
+    // at the pin first, then visibly dragged the whole screen — felt like a
+    // forced scroll.
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) map.panBy([dx, dy], { animate: false });
   });
 }
 

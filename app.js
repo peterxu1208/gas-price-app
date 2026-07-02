@@ -315,7 +315,13 @@ function popupHTML(s) {
 // untouched: re-centering the map on every hover would be disruptive for a mouse
 // user, so this only runs for the tap-to-open (IS_TOUCH) path, and only at
 // mobile widths (matches the toolbar's own @media(max-width:640px) breakpoint).
-function centerPopupOnMobile(marker) {
+// Movement style is flyTo — same as the rest of the app (search, edge chips): a
+// short smooth glide when the popup is nearby, and an automatic
+// zoom-out→travel→zoom-in arc when the target is far for the current zoom.
+// `targetZoom` lets the edge-chip path fold its zoom bump into this SAME flight —
+// one movement total, instead of "fly to pin, popup opens, second slide to
+// center it" (that trailing slide read as a forced scroll).
+function centerPopupOnMobile(marker, targetZoom) {
   if (!window.matchMedia('(max-width:640px)').matches) return;
   requestAnimationFrame(() => {
     const pop = marker.getPopup();
@@ -324,19 +330,17 @@ function centerPopupOnMobile(marker) {
     const rect = el.getBoundingClientRect();
     const toolbar = document.querySelector('.topbar');
     const topInset = toolbar ? toolbar.getBoundingClientRect().bottom : 0;
-    const targetCenterX = window.innerWidth / 2;
-    const targetCenterY = (topInset + window.innerHeight) / 2;
-    const dx = (rect.left + rect.width / 2) - targetCenterX;
-    const dy = (rect.top + rect.height / 2) - targetCenterY;
-    // flyTo (not panBy) — same movement style as the rest of the app (edge chips,
-    // search): a short smooth glide when the popup is nearby, and an automatic
-    // zoom-out→travel→zoom-in arc when the target is far for the current zoom.
-    // Leaflet scales the path + duration from the pixel distance, so tiny
-    // adjustments stay subtle instead of a fixed-speed forced scroll.
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
-      const target = map.containerPointToLatLng(map.getSize().divideBy(2).add([dx, dy]));
-      map.flyTo(target, map.getZoom());
-    }
+    const z = targetZoom == null ? map.getZoom() : targetZoom;
+    const popC = L.point(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    const safeC = L.point(window.innerWidth / 2, (topInset + window.innerHeight) / 2);
+    if (z === map.getZoom() && Math.abs(popC.x - safeC.x) <= 2 && Math.abs(popC.y - safeC.y) <= 2) return;
+    // Solve at the TARGET zoom: the popup card is DOM-sized (it doesn't scale
+    // with the map), so its center keeps a fixed pixel vector from the marker.
+    // Find the map center that lands the popup on the safe-area center.
+    const v = popC.subtract(map.latLngToContainerPoint(marker.getLatLng()));  // marker → popup center
+    const markerDst = safeC.subtract(v);                                      // where the marker must land
+    const centerPt = map.project(marker.getLatLng(), z).subtract(markerDst.subtract(map.getSize().divideBy(2)));
+    map.flyTo(map.unproject(centerPt, z), z);
   });
 }
 
@@ -494,9 +498,20 @@ function updateEdgeIndicators() {
 }
 
 function setActiveFromEdge(s) {
-  map.flyTo([s.lat, s.lng], Math.max(map.getZoom(), 14), { duration: .55 });
+  const mk = markerById[s.id];
+  const z = Math.max(map.getZoom(), 14);
+  if (mk && IS_TOUCH && window.matchMedia('(max-width:640px)').matches) {
+    // ONE flight: open the popup while it's still off-screen (invisible), then
+    // fly straight to the spot that centers the POPUP — zoom bump included.
+    // The old fly-to-pin → moveend → open → re-center did a second vertical
+    // slide after the popup appeared, which read as a forced scroll.
+    map.closePopup();
+    mk.openPopup();
+    centerPopupOnMobile(mk, z);
+    return;
+  }
+  map.flyTo([s.lat, s.lng], z, { duration: .55 });
   map.once('moveend', () => {
-    const mk = markerById[s.id];
     if (mk) { if (IS_TOUCH) { mk.fire('click'); } else { mk.openPopup(); } }
   });
 }

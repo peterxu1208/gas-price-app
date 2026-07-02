@@ -502,11 +502,8 @@ function rectsOf(sels) {
   }
   return rects;
 }
-// whole floating UI (regular off-screen chips stay off it entirely)
+// whole floating UI — chips never sit on it
 function chipOccluders() { return rectsOf(['.topstack', '.home-float']); }
-// just the INTERACTIVE/readable parts — chips parked on the toolbar may sit on
-// the card's whitespace but must never cover these
-function chipControlRects() { return rectsOf(['.searchrow', '.trow.toprow', '.seg', '.brandfilter', '.home-float']); }
 const edgeLayer = document.getElementById('edgeIndicators');
 const edgeChips = new Map();   // station id -> { el, arrow, val, station } reusable chip
 
@@ -526,23 +523,24 @@ function updateEdgeIndicators() {
   const box = { left: EDGE_INSET.left, top: EDGE_INSET.top, right: size.x - EDGE_INSET.right, bottom: size.y - EDGE_INSET.bottom };
   const cx = (box.left + box.right) / 2, cy = (box.top + box.bottom) / 2;
   const occ = chipOccluders();
-  const ctrl = chipControlRects();
   const best = cheapest();
   const seen = new Set();
   const placed = [];   // this frame's chips; positioned in bulk after de-overlap
 
-  // Keep a chip inside the box and out from under the toolbar/home group.
+  // Keep a chip inside the box and off the toolbar/home group.
   // Also flags WHICH axis got clamped: the de-overlap pass must spread
   // edge-pinned chips along the free axis, or the clamp just snaps them back
   // (top-row chips pushed apart vertically re-collapse onto the edge line).
-  // Chips for pins hidden BEHIND the UI (c.overUi) are exempt from the occluder
-  // push — they park at the pin's own position, rendered ON TOP of the toolbar
-  // (#edgeIndicators z 1001 > toolbar 1000), instead of all piling below it.
+  // Chips for pins hidden BEHIND the UI (c.overUi) become direction chips
+  // parked just OUTSIDE the covering card — on whichever of its right/bottom
+  // edges is nearer the pin, preserving the pin's other coordinate (its
+  // relative position along the bar). The edge is chosen ONCE per frame and
+  // then enforced, so de-overlap shifts can't drag the chip back onto the card.
   function constrain(c) {
     // clamp by the chip's HALF-SIZE, not a fixed margin — a fixed 10px let
     // corner-clamped chips hang half off-screen (chips are ~72px wide)
     const hx = c.w / 2 + 2, hy = c.h / 2 + 2;
-    const nx = Math.max(box.left + hx, Math.min(box.right - hx, c.cxp));
+    let nx = Math.max(box.left + hx, Math.min(box.right - hx, c.cxp));
     let ny = Math.max(box.top + hy, Math.min(box.bottom - hy, c.cyp));
     c.pinnedX = nx !== c.cxp;
     c.pinnedY = ny !== c.cyp;
@@ -551,46 +549,21 @@ function updateEdgeIndicators() {
         if (nx > r.left - c.w / 2 && nx < r.right + c.w / 2 && ny < r.bottom + c.h / 2 + 10) { ny = r.bottom + c.h / 2 + 10; c.pinnedY = true; }
       });
     } else {
-      // Parked on the toolbar: may sit on card whitespace, but never COVER a
-      // control (search bar, grade/brand buttons, title, home group). Nudge the
-      // minimum distance off each control it touches, considering ONLY exits
-      // that land inside the screen (an "up" exit from the top-anchored search
-      // bar is off-screen — picking it and then clamping put the chip right
-      // back on the control). A few sweeps let a chip escape stacked rows.
-      for (let sweep = 0; sweep < 4; sweep++) {
-        let hit = false;
-        ctrl.forEach(r => {
-          const mx = c.w / 2 + 4, my = c.h / 2 + 4;
-          if (!(nx > r.left - mx && nx < r.right + mx && ny > r.top - my && ny < r.bottom + my)) return;
-          hit = true;
-          const exits = [
-            { x: r.left - mx, y: ny, d: nx - (r.left - mx), ok: r.left - mx >= box.left + hx },
-            { x: r.right + mx, y: ny, d: (r.right + mx) - nx, ok: r.right + mx <= box.right - hx },
-            { x: nx, y: r.top - my, d: ny - (r.top - my), ok: r.top - my >= box.top + hy },
-            { x: nx, y: r.bottom + my, d: (r.bottom + my) - ny, ok: r.bottom + my <= box.bottom - hy }
-          ].filter(o => o.ok).sort((a, b) => a.d - b.d);
-          if (exits.length) { nx = exits[0].x; ny = exits[0].y; }
-        });
-        if (!hit) break;
+      if (!c.exitEdge) {
+        // find the rect covering the pin (tag extent, same as the hidden test)
+        const rr = occ.find(r => c.pt.x >= r.left - 30 && c.pt.x <= r.right + 30 &&
+          ((c.pt.y >= r.top && c.pt.y <= r.bottom) || (c.pt.y - 26 >= r.top && c.pt.y - 26 <= r.bottom))) || occ[0];
+        const rightFits = rr.right + c.w + 12 <= box.right;   // right exit stays on screen (false on mobile's full-width bar)
+        c.exitEdge = (rightFits && rr.right - c.pt.x <= rr.bottom - c.pt.y) ? 'right' : 'bottom';
+        c.exitRect = rr;
       }
-      // The card's rows are stacked with gaps SMALLER than a chip, so the
-      // min-push can ping-pong between two rows and never escape. If the chip
-      // still touches a control, bail out of the whole UI stack sideways at its
-      // current height (stays next to its pin), or below it if sideways is off-screen.
-      const mX = c.w / 2 + 4, mY = c.h / 2 + 4;
-      if (ctrl.some(r => nx > r.left - mX && nx < r.right + mX && ny > r.top - mY && ny < r.bottom + mY)) {
-        occ.forEach(r => {
-          if (!(nx > r.left - mX && nx < r.right + mX && ny > r.top - mY && ny < r.bottom + mY)) return;
-          const exits = [
-            { x: r.left - mX, y: ny, d: nx - (r.left - mX), ok: r.left - mX >= box.left + hx },
-            { x: r.right + mX, y: ny, d: (r.right + mX) - nx, ok: r.right + mX <= box.right - hx },
-            { x: nx, y: r.bottom + mY, d: (r.bottom + mY) - ny, ok: true }
-          ].filter(o => o.ok).sort((a, b) => a.d - b.d);
-          if (exits.length) { nx = exits[0].x; ny = exits[0].y; }
-        });
-      }
-      nx = Math.max(box.left + hx, Math.min(box.right - hx, nx));
-      ny = Math.max(box.top + hy, ny);
+      if (c.exitEdge === 'right') { nx = Math.max(nx, c.exitRect.right + hx + 6); c.pinnedX = true; }
+      else { ny = Math.max(ny, c.exitRect.bottom + hy + 6); c.pinnedY = true; }
+      // still clear the OTHER floating UI piece (e.g. a bottom exit from the
+      // toolbar landing on the home group, or a right exit grazing it)
+      occ.forEach(r => {
+        if (nx > r.left - c.w / 2 && nx < r.right + c.w / 2 && ny < r.bottom + c.h / 2 + 10) { ny = r.bottom + c.h / 2 + 10; c.pinnedY = true; }
+      });
     }
     if (ny > box.bottom - hy) { ny = box.bottom - hy; c.pinnedY = true; }
     c.cxp = nx; c.cyp = ny;
@@ -610,9 +583,9 @@ function updateEdgeIndicators() {
     if (inBox && !behindUi) return;  // genuinely visible: no chip
     let cxp, cyp;
     if (inBox) {
-      // Pin is on-screen but hidden BEHIND the toolbar/home group: park the chip
-      // AT the pin's own position, rendered on top of the bar (see constrain()),
-      // so it marks the real spot instead of piling below the toolbar stack.
+      // Pin is on-screen but covered by the toolbar/home group: start at the pin;
+      // constrain() projects the chip out to the covering card's nearest
+      // right/bottom edge, keeping the pin's other coordinate.
       cxp = pt.x; cyp = pt.y;
     } else {
       // direction from view-box center to the off-screen point, clamped to the box edge
@@ -647,7 +620,7 @@ function updateEdgeIndicators() {
   // escapes the box or slides back under the toolbar. ≤ a few dozen chips, so
   // the O(n²) pass is nothing.
   const GAP = 6;
-  for (let iter = 0; iter < 12; iter++) {   // corner piles (pinned on both axes) converge slowest
+  for (let iter = 0; iter < 24; iter++) {   // long single-edge columns converge slowest (~2 rounds per chip)
     let moved = false;
     for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) {
       const a = placed[i], b = placed[j];
@@ -665,6 +638,36 @@ function updateEdgeIndicators() {
     if (!moved) break;
     placed.forEach(constrain);
   }
+
+  // Deterministic cleanup for chips sharing one edge: the pairwise pass stalls
+  // when chips are pinned against BOTH an edge clamp and the toolbar floor
+  // (every vertical push snaps back), leaving slight overlaps. Sort each edge
+  // column top→bottom (row left→right) and enforce spacing directly.
+  function sweep1D(members, posKey, dimKey, hi) {
+    members.sort((a, b) => a[posKey] - b[posKey]);
+    for (let i = 1; i < members.length; i++) {
+      const need = (members[i - 1][dimKey] + members[i][dimKey]) / 2 + GAP;
+      if (members[i][posKey] - members[i - 1][posKey] < need) members[i][posKey] = members[i - 1][posKey] + need;
+    }
+    const last = members[members.length - 1];
+    const over = last[posKey] - (hi - last[dimKey] / 2 - 2);
+    if (over > 0) members.forEach(m => { m[posKey] -= over; });   // slide chain back; constrain() re-floors if needed
+  }
+  // Cluster by POSITION, not by pinned flags — a chip already resting exactly
+  // on the clamp line was never "moved" by it, so flags miss settled columns.
+  function edgeClusters(coordKey) {
+    const arr = [...placed].sort((a, b) => a[coordKey] - b[coordKey]);
+    const out = []; let cur = [];
+    arr.forEach(c => {
+      if (cur.length && c[coordKey] - cur[cur.length - 1][coordKey] > 30) { if (cur.length > 1) out.push(cur); cur = []; }
+      cur.push(c);
+    });
+    if (cur.length > 1) out.push(cur);
+    return out;
+  }
+  edgeClusters('cxp').forEach(g => sweep1D(g, 'cyp', 'h', box.bottom));   // columns
+  edgeClusters('cyp').forEach(g => sweep1D(g, 'cxp', 'w', box.right));    // rows
+  placed.forEach(constrain);   // never let the sweep slide a chip back onto the UI
 
   // final write; arrow points from the chip's FINAL position toward the actual
   // station — exact even after clamps, occluder push-downs and de-overlap shifts.

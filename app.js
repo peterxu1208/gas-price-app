@@ -340,7 +340,14 @@ function centerPopupOnMobile(marker, targetZoom) {
     const v = popC.subtract(map.latLngToContainerPoint(marker.getLatLng()));  // marker → popup center
     const markerDst = safeC.subtract(v);                                      // where the marker must land
     const centerPt = map.project(marker.getLatLng(), z).subtract(markerDst.subtract(map.getSize().divideBy(2)));
-    map.flyTo(map.unproject(centerPt, z), z);
+    // Pacing modeled on Google Maps' camera: Leaflet's default flight duration is
+    // distance×0.8s, so short recenters blink by in ~0.25s. Google gives even a
+    // short hop a relaxed beat and lets long/zooming flights stretch, capped so
+    // nothing drags. Floor 0.8s; + screen-distance; + per-zoom-level beat; cap 1.6s.
+    // (flyTo's built-in ease-out — fast start, soft landing — matches Google's feel.)
+    const dz = Math.abs(z - map.getZoom());
+    const dur = Math.min(1.6, 0.8 + popC.distanceTo(safeC) / 2000 + dz * 0.25);
+    map.flyTo(map.unproject(centerPt, z), z, { duration: dur });
   });
 }
 

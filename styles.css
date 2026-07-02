@@ -50,11 +50,15 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
    toolbar in that case — regular off-screen chips are kept off it). The locate
    button + map badge sit at 1002 so chips never cover them. */
 #edgeIndicators{position:absolute;inset:0;z-index:1001;pointer-events:none}
+/* Positioned by app.js via inline transform (compositor-only, runs every map
+   frame) — so transform must NOT be transitioned or hover-overridden here:
+   a transform transition smears the per-frame position updates (chips lag the
+   map), and a :hover transform would fight the inline position. */
 .edge-chip{position:absolute;pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:5px;
   background:#fff;border:1.5px solid var(--brand,var(--line-bright));border-radius:20px;padding:5px 9px 5px 7px;
   font-family:'Poppins',sans-serif;font-weight:700;font-size:var(--fs-sm);color:var(--txt);
-  box-shadow:0 5px 14px rgba(40,42,48,.22);white-space:nowrap;transition:transform .15s}
-.edge-chip:hover{transform:scale(1.06)}
+  box-shadow:0 5px 14px rgba(40,42,48,.22);white-space:nowrap;transition:box-shadow .15s,filter .15s}
+.edge-chip:hover{box-shadow:0 7px 18px rgba(40,42,48,.3);filter:brightness(1.03)}
 .edge-chip .arrow{width:13px;height:13px;flex:none;color:var(--muted)}
 .edge-chip.best{border-color:var(--fresh);color:#0b7a41}
 .edge-chip.best .arrow{color:var(--fresh)}

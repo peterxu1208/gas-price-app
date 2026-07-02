@@ -508,8 +508,13 @@ const edgeLayer = document.getElementById('edgeIndicators');
 const edgeChips = new Map();   // station id -> { el, arrow, val, station } reusable chip
 
 // Built once per station, then reused every frame — avoids per-move DOM churn.
+// Positioned via TRANSFORM (left/top stay 0): updateEdgeIndicators runs every
+// map-move frame, and left/top writes on absolute elements dirty layout, which
+// turns the next frame's rect reads into full reflows — that thrash was the
+// pan/zoom lag. Transform updates are compositor-only.
 function makeEdgeChip() {
   const el = document.createElement('div');
+  el.style.left = '0'; el.style.top = '0';
   el.style.transform = 'translate(-50%,-50%)';
   el.innerHTML = '<svg class="arrow" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2L4.5 20l7.5-4.2L19.5 20z"/></svg><span class="ec-val"></span>';
   const rec = { el, arrow: el.querySelector('.arrow'), val: el.querySelector('.ec-val'), station: null };
@@ -601,16 +606,28 @@ function updateEdgeIndicators() {
     let rec = edgeChips.get(s.id);
     if (!rec) { rec = makeEdgeChip(); edgeLayer.appendChild(rec.el); edgeChips.set(s.id, rec); }
     rec.station = s;
-    rec.el.className = `edge-chip ${s.brand} ${isBest ? 'best' : ''}`;
-    rec.el.style.setProperty('--brand', brandColor(s.brand));   // accent for known brands
-    rec.val.textContent = p == null ? 'N/A' : '$' + p.toFixed(2);
-    rec.el.title = `${s.name} · ${s.distanceMi.toFixed(2)} mi — tap to view`;   // .title is plain text, no escaping
+    // Write DOM only on CHANGE — this runs every map-move frame, and blind
+    // className/text writes dirty layout, turning the size reads below into a
+    // per-frame reflow storm (the pan/zoom lag). A content change also
+    // invalidates the cached size.
+    const cls = `edge-chip ${s.brand} ${isBest ? 'best' : ''}`;
+    if (rec.cls !== cls) { rec.el.className = cls; rec.cls = cls; rec.size = null; }
+    const bc = brandColor(s.brand);   // accent for known brands
+    if (rec.bc !== bc) { rec.el.style.setProperty('--brand', bc); rec.bc = bc; }
+    const txt = p == null ? 'N/A' : '$' + p.toFixed(2);
+    if (rec.txt !== txt) { rec.val.textContent = txt; rec.txt = txt; rec.size = null; }
+    const title = `${s.name} · ${s.distanceMi.toFixed(2)} mi — tap to view`;   // .title is plain text, no escaping
+    if (rec.title !== title) { rec.el.title = title; rec.title = title; }
     seen.add(s.id);
     placed.push({ rec, pt, cxp, cyp, overUi: inBox });
   });
 
-  // measure real sizes once, AFTER all labels are set (single layout pass)
-  placed.forEach(c => { c.w = c.rec.el.offsetWidth || 80; c.h = c.rec.el.offsetHeight || 28; });
+  // sizes: measure only chips whose content changed (offsetWidth forces a
+  // reflow); steady-state pans/zooms measure nothing at all
+  placed.forEach(c => {
+    if (!c.rec.size) c.rec.size = { w: c.rec.el.offsetWidth || 80, h: c.rec.el.offsetHeight || 28 };
+    c.w = c.rec.size.w; c.h = c.rec.size.h;
+  });
   placed.forEach(constrain);
 
   // ---- de-overlap: chips stacked on the same spot hid each other, so you
@@ -675,9 +692,11 @@ function updateEdgeIndicators() {
   // the pin body, which rises above its anchor.
   placed.forEach(c => {
     const adx = c.pt.x - c.cxp, ady = c.pt.y - c.cyp;
-    const deg = Math.abs(adx) < 1 && Math.abs(ady) < 1 ? 0 : Math.atan2(ady, adx) * 180 / Math.PI + 90;
-    c.rec.el.style.left = c.cxp + 'px'; c.rec.el.style.top = c.cyp + 'px';
-    c.rec.arrow.style.transform = `rotate(${deg}deg)`;
+    const deg = Math.round(Math.abs(adx) < 1 && Math.abs(ady) < 1 ? 0 : Math.atan2(ady, adx) * 180 / Math.PI + 90);
+    // transform, not left/top: compositor-only, keeps layout clean between frames
+    const tf = `translate(${Math.round(c.cxp)}px,${Math.round(c.cyp)}px) translate(-50%,-50%)`;
+    if (c.rec.tf !== tf) { c.rec.el.style.transform = tf; c.rec.tf = tf; }
+    if (c.rec.deg !== deg) { c.rec.arrow.style.transform = `rotate(${deg}deg)`; c.rec.deg = deg; }
   });
 
   // retire chips for stations now on-screen or no longer in the active set

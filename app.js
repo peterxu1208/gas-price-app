@@ -302,7 +302,7 @@ const markerById = {};
 function popupHTML(s) {
   const a = ageInfo(updOf(s, state.grade));
   const grades = GORD.map(g => { const v = priceOf(s, g); return `<div class="gc ${g === state.grade ? 'act' : ''}"><div class="g">${GLAB[g]}</div><div class="v ${v == null ? 'none' : ''}">${v == null ? 'N/A' : '$' + v.toFixed(2)}</div></div>`; }).join('');
-  const openTxt = s.openNow == null ? '' : ` · ${s.openNow ? 'open' : 'closed'}`;  // unknown (searched stations) → omit
+  const openTxt = s.openNow == null ? '' : ` · ${s.openNow ? 'Open' : 'Closed'}`;  // unknown (searched stations) → omit
   return `<div class="pop"><div class="ph">${brandImg(s.brand, 'bdg')}<span class="nm">${escapeHtml(s.name)}</span></div>
     <div class="meta">${s.distanceMi.toFixed(2)} mi${openTxt} <span class="fb ${a.cls}"><span class="d"></span>${a.label}</span></div>
     <div class="gr">${grades}</div>
@@ -543,7 +543,7 @@ function updateFreshness() {
     return;
   }
   const a = ageInfo(new Date(newest).toISOString());
-  setStamp('updated ' + a.label);
+  setStamp('Updated ' + a.label);
   if (dot) dot.style.setProperty('--dot', FRESH_COLOR[a.cls] || 'var(--fresh)');
 }
 

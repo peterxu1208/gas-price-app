@@ -529,14 +529,19 @@ function updateEdgeIndicators() {
   // Also flags WHICH axis got clamped: the de-overlap pass must spread
   // edge-pinned chips along the free axis, or the clamp just snaps them back
   // (top-row chips pushed apart vertically re-collapse onto the edge line).
+  // Chips for pins hidden BEHIND the UI (c.overUi) are exempt from the occluder
+  // push — they park at the pin's own position, rendered ON TOP of the toolbar
+  // (#edgeIndicators z 1001 > toolbar 1000), instead of all piling below it.
   function constrain(c) {
     const nx = Math.max(box.left + 10, Math.min(box.right - 10, c.cxp));
     let ny = Math.max(box.top + 10, Math.min(box.bottom - 10, c.cyp));
     c.pinnedX = nx !== c.cxp;
     c.pinnedY = ny !== c.cyp;
-    occ.forEach(r => {
-      if (nx > r.left - c.w / 2 && nx < r.right + c.w / 2 && ny < r.bottom + c.h / 2 + 10) { ny = r.bottom + c.h / 2 + 10; c.pinnedY = true; }
-    });
+    if (!c.overUi) {
+      occ.forEach(r => {
+        if (nx > r.left - c.w / 2 && nx < r.right + c.w / 2 && ny < r.bottom + c.h / 2 + 10) { ny = r.bottom + c.h / 2 + 10; c.pinnedY = true; }
+      });
+    }
     if (ny > box.bottom - 10) { ny = box.bottom - 10; c.pinnedY = true; }
     c.cxp = nx; c.cyp = ny;
   }
@@ -549,8 +554,8 @@ function updateEdgeIndicators() {
     let cxp, cyp;
     if (inBox) {
       // Pin is on-screen but hidden BEHIND the toolbar/home group: park the chip
-      // at the station's own x (constrain() drops it just below the bar), so it
-      // hangs directly beneath the hidden pin instead of flying to an edge.
+      // AT the pin's own position, rendered on top of the bar (see constrain()),
+      // so it marks the real spot instead of piling below the toolbar stack.
       cxp = pt.x; cyp = pt.y;
     } else {
       // direction from view-box center to the off-screen point, clamped to the box edge
@@ -571,7 +576,7 @@ function updateEdgeIndicators() {
     rec.val.textContent = p == null ? 'N/A' : '$' + p.toFixed(2);
     rec.el.title = `${s.name} · ${s.distanceMi.toFixed(2)} mi — tap to view`;   // .title is plain text, no escaping
     seen.add(s.id);
-    placed.push({ rec, pt, cxp, cyp });
+    placed.push({ rec, pt, cxp, cyp, overUi: inBox });
   });
 
   // measure real sizes once, AFTER all labels are set (single layout pass)
@@ -605,10 +610,14 @@ function updateEdgeIndicators() {
   }
 
   // final write; arrow points from the chip's FINAL position toward the actual
-  // station — exact even after clamps, occluder push-downs and de-overlap shifts
+  // station — exact even after clamps, occluder push-downs and de-overlap shifts.
+  // A chip parked exactly ON its (UI-hidden) pin has no direction: point up at
+  // the pin body, which rises above its anchor.
   placed.forEach(c => {
+    const adx = c.pt.x - c.cxp, ady = c.pt.y - c.cyp;
+    const deg = Math.abs(adx) < 1 && Math.abs(ady) < 1 ? 0 : Math.atan2(ady, adx) * 180 / Math.PI + 90;
     c.rec.el.style.left = c.cxp + 'px'; c.rec.el.style.top = c.cyp + 'px';
-    c.rec.arrow.style.transform = `rotate(${Math.atan2(c.pt.y - c.cyp, c.pt.x - c.cxp) * 180 / Math.PI + 90}deg)`;
+    c.rec.arrow.style.transform = `rotate(${deg}deg)`;
   });
 
   // retire chips for stations now on-screen or no longer in the active set

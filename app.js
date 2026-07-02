@@ -539,8 +539,11 @@ function updateEdgeIndicators() {
   // push — they park at the pin's own position, rendered ON TOP of the toolbar
   // (#edgeIndicators z 1001 > toolbar 1000), instead of all piling below it.
   function constrain(c) {
-    const nx = Math.max(box.left + 10, Math.min(box.right - 10, c.cxp));
-    let ny = Math.max(box.top + 10, Math.min(box.bottom - 10, c.cyp));
+    // clamp by the chip's HALF-SIZE, not a fixed margin — a fixed 10px let
+    // corner-clamped chips hang half off-screen (chips are ~72px wide)
+    const hx = c.w / 2 + 2, hy = c.h / 2 + 2;
+    const nx = Math.max(box.left + hx, Math.min(box.right - hx, c.cxp));
+    let ny = Math.max(box.top + hy, Math.min(box.bottom - hy, c.cyp));
     c.pinnedX = nx !== c.cxp;
     c.pinnedY = ny !== c.cyp;
     if (!c.overUi) {
@@ -561,10 +564,10 @@ function updateEdgeIndicators() {
           if (!(nx > r.left - mx && nx < r.right + mx && ny > r.top - my && ny < r.bottom + my)) return;
           hit = true;
           const exits = [
-            { x: r.left - mx, y: ny, d: nx - (r.left - mx), ok: r.left - mx >= box.left + 10 },
-            { x: r.right + mx, y: ny, d: (r.right + mx) - nx, ok: r.right + mx <= box.right - 10 },
-            { x: nx, y: r.top - my, d: ny - (r.top - my), ok: r.top - my >= box.top + 10 },
-            { x: nx, y: r.bottom + my, d: (r.bottom + my) - ny, ok: r.bottom + my <= box.bottom - 10 }
+            { x: r.left - mx, y: ny, d: nx - (r.left - mx), ok: r.left - mx >= box.left + hx },
+            { x: r.right + mx, y: ny, d: (r.right + mx) - nx, ok: r.right + mx <= box.right - hx },
+            { x: nx, y: r.top - my, d: ny - (r.top - my), ok: r.top - my >= box.top + hy },
+            { x: nx, y: r.bottom + my, d: (r.bottom + my) - ny, ok: r.bottom + my <= box.bottom - hy }
           ].filter(o => o.ok).sort((a, b) => a.d - b.d);
           if (exits.length) { nx = exits[0].x; ny = exits[0].y; }
         });
@@ -579,29 +582,31 @@ function updateEdgeIndicators() {
         occ.forEach(r => {
           if (!(nx > r.left - mX && nx < r.right + mX && ny > r.top - mY && ny < r.bottom + mY)) return;
           const exits = [
-            { x: r.left - mX, y: ny, d: nx - (r.left - mX), ok: r.left - mX >= box.left + 10 },
-            { x: r.right + mX, y: ny, d: (r.right + mX) - nx, ok: r.right + mX <= box.right - 10 },
+            { x: r.left - mX, y: ny, d: nx - (r.left - mX), ok: r.left - mX >= box.left + hx },
+            { x: r.right + mX, y: ny, d: (r.right + mX) - nx, ok: r.right + mX <= box.right - hx },
             { x: nx, y: r.bottom + mY, d: (r.bottom + mY) - ny, ok: true }
           ].filter(o => o.ok).sort((a, b) => a.d - b.d);
           if (exits.length) { nx = exits[0].x; ny = exits[0].y; }
         });
       }
-      nx = Math.max(box.left + 10, Math.min(box.right - 10, nx));
-      ny = Math.max(box.top + 10, ny);
+      nx = Math.max(box.left + hx, Math.min(box.right - hx, nx));
+      ny = Math.max(box.top + hy, ny);
     }
-    if (ny > box.bottom - 10) { ny = box.bottom - 10; c.pinnedY = true; }
+    if (ny > box.bottom - hy) { ny = box.bottom - hy; c.pinnedY = true; }
     c.cxp = nx; c.cyp = ny;
   }
 
   visible().forEach(s => {
     const pt = map.latLngToContainerPoint([s.lat, s.lng]);
     const inBox = pt.x >= box.left && pt.x <= box.right && pt.y >= box.top && pt.y <= box.bottom;
-    // hidden test uses the pin's ANCHOR and its VISUAL midpoint (the icon rises
-    // ~52px above the anchor): a pin whose price tag is behind the toolbar but
-    // whose base pokes out is unreadable — it needs a chip too
+    // Hidden test samples the pin's VISUAL EXTENT, not just its anchor point:
+    // the icon rises ~52px above the anchor and the price tag spans ~30px to
+    // each side. A pin whose tag is clipped by the toolbar — vertically OR
+    // horizontally (e.g. tag half-buried under the card's right edge) — is
+    // unreadable and needs a chip, even though its anchor is on open map.
     const midY = pt.y - 26;
-    const behindUi = occ.some(r => pt.x >= r.left && pt.x <= r.right &&
-      ((pt.y >= r.top && pt.y <= r.bottom) || (midY >= r.top && midY <= r.bottom)));
+    const hiddenAt = (x, y) => occ.some(r => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom);
+    const behindUi = hiddenAt(pt.x, pt.y) || hiddenAt(pt.x, midY) || hiddenAt(pt.x - 30, midY) || hiddenAt(pt.x + 30, midY);
     if (inBox && !behindUi) return;  // genuinely visible: no chip
     let cxp, cyp;
     if (inBox) {

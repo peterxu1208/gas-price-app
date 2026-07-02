@@ -328,12 +328,15 @@ function centerPopupOnMobile(marker) {
     const targetCenterY = (topInset + window.innerHeight) / 2;
     const dx = (rect.left + rect.width / 2) - targetCenterX;
     const dy = (rect.top + rect.height / 2) - targetCenterY;
-    // animate:false — this rAF runs BEFORE the popup's first paint, so an instant
-    // pan means the first visible frame already has the popup centered (its own
-    // entrance animation plays in place). An animated pan here painted the popup
-    // at the pin first, then visibly dragged the whole screen — felt like a
-    // forced scroll.
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) map.panBy([dx, dy], { animate: false });
+    // flyTo (not panBy) — same movement style as the rest of the app (edge chips,
+    // search): a short smooth glide when the popup is nearby, and an automatic
+    // zoom-out→travel→zoom-in arc when the target is far for the current zoom.
+    // Leaflet scales the path + duration from the pixel distance, so tiny
+    // adjustments stay subtle instead of a fixed-speed forced scroll.
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      const target = map.containerPointToLatLng(map.getSize().divideBy(2).add([dx, dy]));
+      map.flyTo(target, map.getZoom());
+    }
   });
 }
 

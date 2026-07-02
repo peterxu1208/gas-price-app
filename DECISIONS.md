@@ -209,6 +209,21 @@ function-body change, not a control-flow change. The one external dependency
   vs `renderMarkers()`; the latter is the crossfade wrapper, the former does
   the actual draw. Initial page load skips the fade (no pins exist yet to fade
   out from).
+- **Type scale (design tokens).** Font sizes are role-based CSS custom properties
+  defined once in `:root` — `--fs-title` (18), `--fs-input` (16), `--fs-control`
+  (14), `--fs-caption` (12) — and referenced everywhere, replacing the old
+  scattered hardcoded values (8.5–17px) that had an inverted hierarchy on mobile.
+  The 4-step ladder maps 1:1 to **Tailwind CSS**'s default font sizes
+  (`lg`/`base`/`sm`/`xs` = 18/16/14/12), which also line up with **Material Design 3**
+  Body/Label/Title tokens — so tiers are visibly distinct and nothing sits below the
+  ~12px mobile legibility floor that Tailwind/Material/iOS all observe. Role mapping:
+  title = location name; input = search + set-home fields (16 also prevents iOS
+  Safari's focus-zoom); control = grade buttons, brand chips, home chip; caption =
+  freshness stamp, brand count. Applied **uniformly across breakpoints** (the revised
+  scale converged for mobile readability and desktop compactness), so there are no
+  per-breakpoint font overrides — to diverge one, change a token inside the
+  `@media (max-width:640px)` block, not per-element rules. Poppins remains the family
+  (see Fonts decision above).
 - **The vector "fallback" road drawing.** There's a hand-traced GeoJSON of
   local roads (Main St, Moody St, Waverley Oaks, Totten Pond Rd, I-95, Charles
   River) that only renders if *every* real tile host fails to load. It exists

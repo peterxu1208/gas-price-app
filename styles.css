@@ -5,6 +5,19 @@
   --shell:#e0b000;--mobil:#2563eb;
   --map-bg:#eceae3;--road:#d7d2c7;--road-major:#cbc5b8;--hwy:#ecd9a6;--hwy-edge:#dcc285;--river:#bcd6e8;
   --shadow:0 8px 24px rgba(40,42,48,.14);
+  /* ---- type scale (role-based tokens; single source of truth) ----
+     A 4-step ladder mapping 1:1 to Tailwind lg/base/sm/xs (18/16/14/12), which also
+     lines up with Material Body-Lg/Title-Med, Body-Med, Body-Sm. Each step is 2px
+     apart so tiers read as distinct, and nothing falls below the 12px mobile floor
+     that Tailwind/Material/iOS all observe. --fs-input at 16 also prevents iOS
+     Safari's focus-zoom. Applied uniformly across breakpoints — the revised scale
+     converged to the same values for mobile readability and desktop compactness,
+     so no per-breakpoint override is needed (change a token in one @media block if
+     that ever diverges). */
+  --fs-title:18px;    /* location name */
+  --fs-input:16px;    /* search + set-home text fields */
+  --fs-control:14px;  /* grade buttons, brand chips, home chip */
+  --fs-caption:12px;  /* freshness stamp, brand count */
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins',sans-serif;overflow:hidden}
@@ -66,7 +79,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .home-chip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;
   background:rgba(255,255,255,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   border:1px solid var(--line-bright);border-radius:11px;cursor:pointer;white-space:nowrap;
-  font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;color:var(--txt);
+  font-family:'Poppins',sans-serif;font-size:var(--fs-control);font-weight:600;color:var(--txt);
   box-shadow:var(--shadow);transition:.14s}
 .home-chip:hover:not(:disabled){border-color:var(--fresh)}
 .home-chip:disabled{cursor:default;color:var(--muted-2);background:rgba(241,239,233,.92);border-color:var(--line)}
@@ -89,7 +102,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .home-modal-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:var(--txt)}
 .home-input-wrap{position:relative;display:flex}
 .home-modal-card input{width:100%;height:40px;padding:0 36px 0 13px;border:1px solid var(--line);border-radius:10px;background:#fff;
-  outline:none;font-family:'Poppins',sans-serif;font-size:12px;color:var(--txt);transition:border-color .14s}
+  outline:none;font-family:'Poppins',sans-serif;font-size:var(--fs-input);color:var(--txt);transition:border-color .14s}
 .home-modal-card input:focus{border-color:var(--fresh)}
 .home-modal-card input::placeholder{color:var(--muted-2)}
 .home-input-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:26px;height:26px;
@@ -118,7 +131,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .searchrow.busy{opacity:.7}
 .search-ic{width:14px;height:14px;flex:none;color:var(--muted-2)}
 #searchInput{flex:1 1 auto;min-width:0;height:100%;border:0;background:transparent;outline:none;
-  font-family:'Poppins',sans-serif;font-size:11px;color:var(--txt)}
+  font-family:'Poppins',sans-serif;font-size:var(--fs-input);color:var(--txt)}
 #searchInput::placeholder{color:var(--muted-2)}
 #searchInput:disabled{cursor:progress}
 .search-clear{flex:none;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;line-height:1;
@@ -128,10 +141,10 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .trow::-webkit-scrollbar{display:none}
 .trow.toprow{gap:12px;padding-bottom:7px;border-bottom:1px solid var(--line);justify-content:space-between;align-items:flex-start;overflow:visible}
 .ttl{flex:1 1 auto;min-width:0}
-.ttl h1{font-size:17px;font-weight:800;letter-spacing:-.02em;line-height:1.12;
+.ttl h1{font-size:var(--fs-title);font-weight:700;letter-spacing:-.02em;line-height:1.12;
   overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
 .stamp{margin-top:2px}
-.stamp{display:flex;align-items:center;gap:6px;font-family:'Poppins',sans-serif;font-size:9.5px;color:var(--muted);white-space:nowrap;flex:0 0 auto}
+.stamp{display:flex;align-items:center;gap:6px;font-family:'Poppins',sans-serif;font-size:var(--fs-caption);color:var(--muted);white-space:nowrap;flex:0 0 auto}
 .live-dot{--dot:var(--fresh);width:6px;height:6px;border-radius:50%;background:var(--dot);animation:pulse 2.4s infinite}
 /* --dot is set per data-freshness in JS; halo derives from it (color-mix; degrades to no halo if unsupported) */
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--dot) 40%,transparent)}70%{box-shadow:0 0 0 6px transparent}100%{box-shadow:0 0 0 0 transparent}}
@@ -139,12 +152,12 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .seg{display:flex;align-items:center;background:#efece5;border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px;height:32px;box-sizing:border-box}
 #gradeSeg{width:100%}
 #gradeSeg button{flex:1 1 0;justify-content:center}
-.seg button{font-family:'Poppins',sans-serif;font-size:9.5px;font-weight:600;line-height:1;color:var(--muted);background:transparent;border:0;border-radius:6px;
+.seg button{font-family:'Poppins',sans-serif;font-size:var(--fs-control);font-weight:600;line-height:1;color:var(--muted);background:transparent;border:0;border-radius:6px;
   height:100%;box-sizing:border-box;
   padding:0 7.5px;cursor:pointer;transition:.14s;display:flex;align-items:center;gap:5px;white-space:nowrap}
 .seg button:hover{color:var(--txt)}
 .seg button.on{background:#fff;color:var(--txt);box-shadow:0 1px 3px rgba(40,42,48,.12),inset 0 0 0 1px var(--line-bright)}
-.bcnt{font-weight:500;color:var(--muted-2);font-variant-numeric:tabular-nums}
+.bcnt{font-size:var(--fs-caption);font-weight:500;color:var(--muted-2);font-variant-numeric:tabular-nums}
 .bchk.on .bcnt{color:var(--muted)}
 
 /* ---------- custom tooltip (Other brand breakdown) ---------- */
@@ -160,7 +173,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .brandrow{overflow:visible;margin-top:6px}
 .brandfilter{display:flex;flex-wrap:wrap;gap:6px;width:100%}
 .bchk{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;cursor:pointer;user-select:none;
-  background:#efece5;border:1px solid var(--line);font-family:'Poppins',sans-serif;font-size:9.5px;color:var(--muted);transition:.14s}
+  background:#efece5;border:1px solid var(--line);font-family:'Poppins',sans-serif;font-size:var(--fs-control);color:var(--muted);transition:.14s}
 .bchk:hover{color:var(--txt)}
 .bchk.on{background:#fff;color:var(--txt);box-shadow:0 1px 3px rgba(40,42,48,.12),inset 0 0 0 1px var(--line-bright)}
 .bchk input{margin:0;width:12px;height:12px;flex:none;accent-color:var(--fresh);cursor:pointer}
@@ -324,8 +337,9 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
      full-width row below, so each of its 3 buttons gets real tap-target size
      instead of being squeezed beside the title text. */
   .trow.toprow{grid-area:title;border-bottom:0;padding-bottom:0;overflow:visible}
-  .ttl h1{font-size:13px;font-weight:600;-webkit-line-clamp:1}
-  .stamp{font-size:8.5px}
+  /* size/weight now come from the shared type tokens; mobile only forces the title
+     to a single line so it doesn't push the toolbar taller. */
+  .ttl h1{-webkit-line-clamp:1}
   .graderow{grid-area:grade}
   .brandrow{grid-area:brand;margin-top:0}
   /* single swipeable row instead of wrapping across ~5 lines */
@@ -335,7 +349,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 
   .home-float{padding:0 2px}
   .home-chip,.home-edit{height:28px}
-  .home-chip{padding:0 10px;font-size:10px}
+  .home-chip{padding:0 10px}
   .home-edit{width:28px}
   .home-edit svg{width:13px;height:13px}
   .home-ic{width:12px;height:12px}

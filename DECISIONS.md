@@ -209,21 +209,28 @@ function-body change, not a control-flow change. The one external dependency
   vs `renderMarkers()`; the latter is the crossfade wrapper, the former does
   the actual draw. Initial page load skips the fade (no pins exist yet to fade
   out from).
-- **Type scale (design tokens).** Font sizes are role-based CSS custom properties
-  defined once in `:root` — `--fs-title` (18), `--fs-input` (16), `--fs-control`
-  (14), `--fs-caption` (12) — and referenced everywhere, replacing the old
-  scattered hardcoded values (8.5–17px) that had an inverted hierarchy on mobile.
-  The 4-step ladder maps 1:1 to **Tailwind CSS**'s default font sizes
-  (`lg`/`base`/`sm`/`xs` = 18/16/14/12), which also line up with **Material Design 3**
-  Body/Label/Title tokens — so tiers are visibly distinct and nothing sits below the
-  ~12px mobile legibility floor that Tailwind/Material/iOS all observe. Role mapping:
-  title = location name; input = search + set-home fields (16 also prevents iOS
-  Safari's focus-zoom); control = grade buttons, brand chips, home chip; caption =
-  freshness stamp, brand count. Applied **uniformly across breakpoints** (the revised
-  scale converged for mobile readability and desktop compactness), so there are no
-  per-breakpoint font overrides — to diverge one, change a token inside the
-  `@media (max-width:640px)` block, not per-element rules. Poppins remains the family
-  (see Fonts decision above).
+- **Type scale (design tokens).** Font sizes are CSS custom properties defined once
+  in `:root` and referenced everywhere, replacing the old scattered hardcoded values
+  (8–17px) that had an inverted hierarchy on mobile. Tokens are **size-named after
+  Tailwind CSS** (not role-named, so they read naturally in every context):
+  `--fs-lg` (18), `--fs-base` (16), `--fs-sm` (14), `--fs-xs` (12) — 1:1 with
+  Tailwind `lg`/`base`/`sm`/`xs`, also aligning with **Material Design 3**
+  Body/Label/Title. Each step is 2px apart so tiers stay distinct; `--fs-base` at 16
+  also prevents iOS Safari's input focus-zoom. Applied **uniformly across breakpoints**
+  (the scale converged for mobile readability and desktop compactness) — to diverge
+  one, override the token in the `@media (max-width:640px)` block, not per-element.
+  Two contexts are treated differently on purpose:
+  - **Toolbar + popup = reading UI** → full ladder, nothing below the 12px floor.
+    Toolbar: location name `lg`; search/set-home fields `base`; grade buttons + brand
+    chips + home chip `sm`; freshness + counts `xs`. Popup: station name `lg`; prices
+    `base`; Navigate `sm`; meta + badges + grade mini-labels `xs`.
+  - **Map pins = cartographic labels** → kept compact (an on-map convention; see the
+    Esri/Axis Maps guidance that on-screen labels bottom out ~9–10pt and the primary
+    label is bold/largest). Pin price `sm` (bold), cheapest-pin price `base`; the
+    brand name, `◆ CHEAPEST` crown, and edge-chip use `xs`/`sm` and lean on
+    **uppercase + letter-spacing** for legibility rather than a larger size. This is
+    why pins aren't inflated to the toolbar's sizes.
+  Poppins remains the family (see Fonts decision above).
 - **The vector "fallback" road drawing.** There's a hand-traced GeoJSON of
   local roads (Main St, Moody St, Waverley Oaks, Totten Pond Rd, I-95, Charles
   River) that only renders if *every* real tile host fails to load. It exists

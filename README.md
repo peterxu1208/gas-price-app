@@ -33,7 +33,7 @@ still works). Just open `index.html`.
 | File | What it is |
 |---|---|
 | `index.html` | Markup + asset links. Loads Leaflet (CDN), then `data.js`, `services.js`, `app.js` (in that order). **Open this.** |
-| `styles.css` | All UI styling (was the inline `<style>` block). Font sizes use role-based **design tokens** in `:root` (`--fs-title`/`--fs-input`/`--fs-control`/`--fs-caption`) on a **Tailwind-style scale** (`lg`/`base`/`sm`/`xs` = 18/16/14/12); see DECISIONS.md → "Type scale". |
+| `styles.css` | All UI styling (was the inline `<style>` block). Font sizes use **design tokens** in `:root`, size-named after **Tailwind** (`--fs-lg`/`--fs-base`/`--fs-sm`/`--fs-xs` = 18/16/14/12), used across the toolbar, map pins, and popup; see DECISIONS.md → "Type scale". |
 | `data.js` | The sample-data **fixture** — `HOME` + `getStationData()`, exposed on `window.FuelData`. The current hand-written prices live here. |
 | `services.js` | **The single external-data boundary** (`window.FuelServices`): `geocode()`, `findStationsNear()`, `getCurrentPosition()` (device GPS), `reverseGeocode()`. Calls the Google proxy under `api/` (same-origin `fetch('/api/...')`). Domain helpers (brand classifier, distance) are injected by `app.js` so this layer stays UI-agnostic. |
 | `app.js` | All app logic — map, tiles+fallback, markers/popups, edge indicators, controls, search + home/locate UI. Reads external data **only** through `window.FuelServices`. Home is saved per-device in `localStorage`. Wrapped in an IIFE; boots asynchronously. |

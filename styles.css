@@ -5,19 +5,25 @@
   --shell:#e0b000;--mobil:#2563eb;
   --map-bg:#eceae3;--road:#d7d2c7;--road-major:#cbc5b8;--hwy:#ecd9a6;--hwy-edge:#dcc285;--river:#bcd6e8;
   --shadow:0 8px 24px rgba(40,42,48,.14);
-  /* ---- type scale (role-based tokens; single source of truth) ----
-     A 4-step ladder mapping 1:1 to Tailwind lg/base/sm/xs (18/16/14/12), which also
-     lines up with Material Body-Lg/Title-Med, Body-Med, Body-Sm. Each step is 2px
-     apart so tiers read as distinct, and nothing falls below the 12px mobile floor
-     that Tailwind/Material/iOS all observe. --fs-input at 16 also prevents iOS
-     Safari's focus-zoom. Applied uniformly across breakpoints — the revised scale
-     converged to the same values for mobile readability and desktop compactness,
-     so no per-breakpoint override is needed (change a token in one @media block if
-     that ever diverges). */
-  --fs-title:18px;    /* location name */
-  --fs-input:16px;    /* search + set-home text fields */
-  --fs-control:14px;  /* grade buttons, brand chips, home chip */
-  --fs-caption:12px;  /* freshness stamp, brand count */
+  /* ---- type scale (size-named design tokens; single source of truth) ----
+     A 4-step ladder named 1:1 after Tailwind CSS (lg/base/sm/xs = 18/16/14/12),
+     which also lines up with Material Body-Lg/Title-Med, Body-Med, Body-Sm. Size-
+     named (not role-named) so the same tokens read naturally across every context —
+     toolbar, map pins, and the popup card. Each step is 2px apart so tiers stay
+     distinct, and the reading UI never dips below the 12px mobile floor that
+     Tailwind/Material/iOS observe. --fs-base at 16 also prevents iOS Safari's input
+     focus-zoom. Applied uniformly across breakpoints (values converged for mobile
+     readability + desktop compactness); to diverge one, override the token in the
+     @media block, not per-element.
+     Two contexts, different needs (see DECISIONS.md "Type scale"):
+       • Toolbar + popup = reading UI → full ladder, floor 12.
+       • Map pins = cartographic labels → kept compact (price prominent/bold; the
+         brand name, crown, and grade mini-labels sit at xs and lean on UPPERCASE +
+         letter-spacing for legibility, which is the correct small-label treatment). */
+  --fs-lg:18px;    /* popup station name; toolbar location name */
+  --fs-base:16px;  /* search/set-home fields; popup prices; cheapest-pin price */
+  --fs-sm:14px;    /* grade buttons, brand chips, home chip; pin price; nav button */
+  --fs-xs:12px;    /* captions: freshness, counts, meta, badges, pin brand name */
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins',sans-serif;overflow:hidden}
@@ -42,7 +48,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 #edgeIndicators{position:absolute;inset:0;z-index:999;pointer-events:none}
 .edge-chip{position:absolute;pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:5px;
   background:#fff;border:1.5px solid var(--brand,var(--line-bright));border-radius:20px;padding:5px 9px 5px 7px;
-  font-family:'Poppins',sans-serif;font-weight:700;font-size:11px;color:var(--txt);
+  font-family:'Poppins',sans-serif;font-weight:700;font-size:var(--fs-sm);color:var(--txt);
   box-shadow:0 5px 14px rgba(40,42,48,.22);white-space:nowrap;transition:transform .15s}
 .edge-chip:hover{transform:scale(1.06)}
 .edge-chip .arrow{width:13px;height:13px;flex:none;color:var(--muted)}
@@ -79,7 +85,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .home-chip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;
   background:rgba(255,255,255,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   border:1px solid var(--line-bright);border-radius:11px;cursor:pointer;white-space:nowrap;
-  font-family:'Poppins',sans-serif;font-size:var(--fs-control);font-weight:600;color:var(--txt);
+  font-family:'Poppins',sans-serif;font-size:var(--fs-sm);font-weight:600;color:var(--txt);
   box-shadow:var(--shadow);transition:.14s}
 .home-chip:hover:not(:disabled){border-color:var(--fresh)}
 .home-chip:disabled{cursor:default;color:var(--muted-2);background:rgba(241,239,233,.92);border-color:var(--line)}
@@ -102,7 +108,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .home-modal-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:var(--txt)}
 .home-input-wrap{position:relative;display:flex}
 .home-modal-card input{width:100%;height:40px;padding:0 36px 0 13px;border:1px solid var(--line);border-radius:10px;background:#fff;
-  outline:none;font-family:'Poppins',sans-serif;font-size:var(--fs-input);color:var(--txt);transition:border-color .14s}
+  outline:none;font-family:'Poppins',sans-serif;font-size:var(--fs-base);color:var(--txt);transition:border-color .14s}
 .home-modal-card input:focus{border-color:var(--fresh)}
 .home-modal-card input::placeholder{color:var(--muted-2)}
 .home-input-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:26px;height:26px;
@@ -131,7 +137,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .searchrow.busy{opacity:.7}
 .search-ic{width:14px;height:14px;flex:none;color:var(--muted-2)}
 #searchInput{flex:1 1 auto;min-width:0;height:100%;border:0;background:transparent;outline:none;
-  font-family:'Poppins',sans-serif;font-size:var(--fs-input);color:var(--txt)}
+  font-family:'Poppins',sans-serif;font-size:var(--fs-base);color:var(--txt)}
 #searchInput::placeholder{color:var(--muted-2)}
 #searchInput:disabled{cursor:progress}
 .search-clear{flex:none;border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;line-height:1;
@@ -141,10 +147,10 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .trow::-webkit-scrollbar{display:none}
 .trow.toprow{gap:12px;padding-bottom:7px;border-bottom:1px solid var(--line);justify-content:space-between;align-items:flex-start;overflow:visible}
 .ttl{flex:1 1 auto;min-width:0}
-.ttl h1{font-size:var(--fs-title);font-weight:700;letter-spacing:-.02em;line-height:1.12;
+.ttl h1{font-size:var(--fs-lg);font-weight:700;letter-spacing:-.02em;line-height:1.12;
   overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
 .stamp{margin-top:2px}
-.stamp{display:flex;align-items:center;gap:6px;font-family:'Poppins',sans-serif;font-size:var(--fs-caption);color:var(--muted);white-space:nowrap;flex:0 0 auto}
+.stamp{display:flex;align-items:center;gap:6px;font-family:'Poppins',sans-serif;font-size:var(--fs-xs);color:var(--muted);white-space:nowrap;flex:0 0 auto}
 .live-dot{--dot:var(--fresh);width:6px;height:6px;border-radius:50%;background:var(--dot);animation:pulse 2.4s infinite}
 /* --dot is set per data-freshness in JS; halo derives from it (color-mix; degrades to no halo if unsupported) */
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--dot) 40%,transparent)}70%{box-shadow:0 0 0 6px transparent}100%{box-shadow:0 0 0 0 transparent}}
@@ -152,12 +158,12 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .seg{display:flex;align-items:center;background:#efece5;border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px;height:32px;box-sizing:border-box}
 #gradeSeg{width:100%}
 #gradeSeg button{flex:1 1 0;justify-content:center}
-.seg button{font-family:'Poppins',sans-serif;font-size:var(--fs-control);font-weight:600;line-height:1;color:var(--muted);background:transparent;border:0;border-radius:6px;
+.seg button{font-family:'Poppins',sans-serif;font-size:var(--fs-sm);font-weight:600;line-height:1;color:var(--muted);background:transparent;border:0;border-radius:6px;
   height:100%;box-sizing:border-box;
   padding:0 7.5px;cursor:pointer;transition:.14s;display:flex;align-items:center;gap:5px;white-space:nowrap}
 .seg button:hover{color:var(--txt)}
 .seg button.on{background:#fff;color:var(--txt);box-shadow:0 1px 3px rgba(40,42,48,.12),inset 0 0 0 1px var(--line-bright)}
-.bcnt{font-size:var(--fs-caption);font-weight:500;color:var(--muted-2);font-variant-numeric:tabular-nums}
+.bcnt{font-size:var(--fs-xs);font-weight:500;color:var(--muted-2);font-variant-numeric:tabular-nums}
 .bchk.on .bcnt{color:var(--muted)}
 
 /* ---------- custom tooltip (Other brand breakdown) ---------- */
@@ -173,7 +179,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .brandrow{overflow:visible;margin-top:6px}
 .brandfilter{display:flex;flex-wrap:wrap;gap:6px;width:100%}
 .bchk{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;cursor:pointer;user-select:none;
-  background:#efece5;border:1px solid var(--line);font-family:'Poppins',sans-serif;font-size:var(--fs-control);color:var(--muted);transition:.14s}
+  background:#efece5;border:1px solid var(--line);font-family:'Poppins',sans-serif;font-size:var(--fs-sm);color:var(--muted);transition:.14s}
 .bchk:hover{color:var(--txt)}
 .bchk.on{background:#fff;color:var(--txt);box-shadow:0 1px 3px rgba(40,42,48,.12),inset 0 0 0 1px var(--line-bright)}
 .bchk input{margin:0;width:12px;height:12px;flex:none;accent-color:var(--fresh);cursor:pointer}
@@ -207,18 +213,18 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .pin.fade-in{opacity:0;transform:translateY(7px) scale(.9)}
 .pin.fade-in.show{opacity:1;transform:translateY(0) scale(1)}
 .ptag{display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:#fff;border:1.5px solid var(--brand,var(--line-bright));
-  border-radius:9px;padding:8px 9px 5px;font-family:'Poppins',sans-serif;font-weight:700;font-size:13px;color:var(--txt);
+  border-radius:9px;padding:8px 9px 5px;font-family:'Poppins',sans-serif;font-weight:700;font-size:var(--fs-sm);color:var(--txt);
   box-shadow:0 5px 14px rgba(40,42,48,.22);white-space:nowrap;transition:box-shadow .14s ease}
-.ptag-nm{font-size:9px;font-weight:600;letter-spacing:.03em;color:var(--muted-2);line-height:1;text-transform:uppercase}
+.ptag-nm{font-size:var(--fs-xs);font-weight:600;letter-spacing:.03em;color:var(--muted-2);line-height:1;text-transform:uppercase}
 .ptag-price{display:flex;align-items:center;gap:5px;line-height:1}
 .ptag .fdot{width:6px;height:6px;border-radius:50%;flex:none}
 .ptag.nodata{color:var(--nodata);border-color:var(--line);border-style:dashed;background:#faf9f6}
 .pin .stem{width:2px;height:8px;background:var(--brand,var(--line-bright))}
 .pin .base{width:7px;height:7px;border-radius:50%;background:var(--brand,var(--line-bright));margin-top:-2px}
 .pin.best .ptag{background:linear-gradient(150deg,#e9f9f0,#ddf4e8);border-color:var(--fresh);color:#0b7a41;
-  font-size:15px;padding:7px 11px;box-shadow:0 0 0 3px rgba(15,155,84,.16),0 10px 22px rgba(40,80,60,.22)}
+  font-size:var(--fs-base);padding:7px 11px;box-shadow:0 0 0 3px rgba(15,155,84,.16),0 10px 22px rgba(40,80,60,.22)}
 .pin.best{z-index:9000}
-.crown{position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-family:'Poppins',sans-serif;font-size:8px;
+.crown{position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-family:'Poppins',sans-serif;font-size:var(--fs-xs);
   letter-spacing:.12em;color:#fff;background:var(--fresh);padding:2px 6px;border-radius:20px;font-weight:700;white-space:nowrap;box-shadow:0 3px 8px rgba(15,155,84,.3)}
 .homepin{display:flex;flex-direction:column;align-items:center}
 .homepin .h{width:30px;height:30px;border-radius:50% 50% 4px 50%;transform:rotate(45deg);
@@ -281,9 +287,9 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .pop .ph{display:flex;align-items:center;gap:8px;margin-bottom:3px}
 .pop .ph .dot{width:9px;height:9px;border-radius:50%}
 .pop .ph .dot.shell{background:var(--shell)} .pop .ph .dot.mobil{background:var(--mobil)}
-.pop .nm{font-size:16px;font-weight:700;letter-spacing:-.01em}
-.pop .meta{font-family:'Poppins',sans-serif;font-size:10px;color:var(--muted);margin:5px 0 11px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.pop .fb{display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:20px;font-size:9px}
+.pop .nm{font-size:var(--fs-lg);font-weight:700;letter-spacing:-.01em}
+.pop .meta{font-family:'Poppins',sans-serif;font-size:var(--fs-xs);color:var(--muted);margin:5px 0 11px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pop .fb{display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:20px;font-size:var(--fs-xs)}
 .pop .fb .d{width:5px;height:5px;border-radius:50%}
 .fb-fresh{background:#e3f6ec;color:var(--fresh)} .fb-fresh .d{background:var(--fresh)}
 .fb-aging{background:#fbf0d8;color:var(--aging)} .fb-aging .d{background:var(--aging)}
@@ -292,10 +298,10 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
 .pop .gr{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px}
 .pop .gc{background:#f6f5f1;border:1px solid var(--line);border-radius:8px;padding:7px 4px;text-align:center}
 .pop .gc.act{border-color:var(--fresh);background:#eefaf3}
-.pop .gc .g{font-family:'Poppins',sans-serif;font-size:8px;letter-spacing:.08em;color:var(--muted-2);text-transform:uppercase}
-.pop .gc .v{font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;margin-top:2px}
+.pop .gc .g{font-family:'Poppins',sans-serif;font-size:var(--fs-xs);letter-spacing:.08em;color:var(--muted-2);text-transform:uppercase}
+.pop .gc .v{font-family:'Poppins',sans-serif;font-size:var(--fs-base);font-weight:600;margin-top:2px}
 .pop .gc .v.none{color:var(--muted-2)}
-.pop a.nav{display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;
+.pop a.nav{display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;font-family:'Poppins',sans-serif;font-size:var(--fs-sm);font-weight:600;
   color:#fff;background:var(--fresh);border-radius:8px;padding:9px;transition:filter .15s;box-shadow:0 3px 10px rgba(15,155,84,.25)}
 .pop a.nav:hover{filter:brightness(1.06)}
 

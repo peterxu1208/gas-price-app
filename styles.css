@@ -246,14 +246,20 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
    or the entrance reads as "not fluid": opacity finishing far ahead of the scale is
    the mismatch that looked janky (was .06s opacity vs .17s scale). Both now run at
    .16s on the same ease-out curve, so the card fades + grows out of the pin as one
-   motion. The opacity lives on the outer .leaflet-popup (Leaflet's) and ALSO drives
-   the fade-OUT on close, so closing is now a smooth .16s fade instead of an abrupt
-   60ms blink. The scale is a keyframe on the inner card only — keyframes can't
-   reverse (entrance-only, which is fine), the outer popup's transform is Leaflet's
-   for positioning, and scaling the tip separately from the card looks disjoint.
-   transform-origin bottom-center = grows from the pin; will-change keeps it on its
-   own GPU layer so the card's big shadow doesn't re-rasterize mid-animation. */
+   motion. The opacity lives on the outer .leaflet-popup (Leaflet's). The scale is
+   a keyframe on the inner card only — keyframes can't reverse (entrance-only,
+   which is fine), the outer popup's transform is Leaflet's for positioning, and
+   scaling the tip separately from the card looks disjoint. transform-origin
+   bottom-center = grows from the pin; will-change keeps it on its own GPU layer
+   so the card's big shadow doesn't re-rasterize mid-animation. */
 .leaflet-fade-anim .leaflet-popup{transition:opacity .16s cubic-bezier(.16,1,.3,1)}
+/* EXIT is deliberately different from the entrance (Material motion: exits are
+   shorter and accelerate — the eye doesn't need to track something leaving).
+   Reusing the entrance's ease-out BACKWARDS for the fade-out made opacity crash
+   to ~20% in the first 40ms then ghost-linger for the rest — read as jank.
+   app.js adds .pop-closing on popupclose and removes it on popupopen (Leaflet
+   reuses the same popup container across opens, so it must be cleaned up). */
+.leaflet-fade-anim .leaflet-popup.pop-closing{transition:opacity .1s cubic-bezier(.4,0,1,1)}
 @keyframes popupIn { from { transform: translateY(5px) scale(.94); } to { transform: none; } }
 .leaflet-popup-content-wrapper{
   transform-origin:bottom center;

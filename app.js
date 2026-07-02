@@ -429,14 +429,14 @@ function renderMarkers() {
    the popup. Once open, a grace window lets the cursor travel from the pin onto the
    popup card (to read it / click NAVIGATE) without it closing: entering the card
    cancels the pending close, leaving both the pin and the card schedules it. */
-// Snappier on desktop: shorter dwell so the card appears promptly, shorter grace
-// so it doesn't visibly linger after the cursor leaves. Kept non-zero so a fast
-// fly-by across clustered pins still doesn't strobe (a continuous sweep spends
-// <60ms over each pin) and so the cursor can still cross the pin→card gap before
-// close — that gap is only the ~17px tip, so 80ms is enough grace to reach the
-// card (whose mouseenter cancels the pending close). Anti-flicker otherwise comes
-// from structure — geometry-safe hover + non-interactive tip — not timing.
-const HOVER_OPEN_MS = 60, HOVER_CLOSE_MS = 80;
+// Snappier on desktop: short dwell so the card appears promptly (NN/g: responses
+// under ~100ms read as instant; dwell 40 + fade start ≈ within that), shorter
+// grace so it doesn't visibly linger after the cursor leaves. Dwell kept non-zero
+// so a fast fly-by across clustered pins still doesn't strobe, and 80ms grace
+// lets the cursor cross the ~17px pin→card gap before close (the card's
+// mouseenter cancels the pending close). Anti-flicker otherwise comes from
+// structure — geometry-safe hover + non-interactive tip — not timing.
+const HOVER_OPEN_MS = 40, HOVER_CLOSE_MS = 80;
 let hoverOpenTimer = null, closeTimer = null, hoverMarker = null;
 function cancelHoverOpen() { clearTimeout(hoverOpenTimer); hoverOpenTimer = null; }
 function cancelPendingClose() { clearTimeout(closeTimer); closeTimer = null; }
@@ -452,6 +452,20 @@ function scheduleClose() {
 
 map.on('popupopen', e => {
   if (IS_TOUCH) applyLogoFallbacks(e.popup.getElement());   // non-touch path wires this itself via pop.on('add')
+  // Leaflet reuses the popup container across opens — clear the exit-speed class
+  // so the ENTRANCE runs on its own (longer, ease-out) transition. See styles.css.
+  const el = e.popup.getElement();
+  if (el) el.classList.remove('pop-closing');
+});
+
+// Exits are faster than entrances (Material motion): tag the popup at close time
+// so CSS can give the fade-OUT its own short accelerate transition. This fires
+// synchronously inside the close call — same style pass as Leaflet's opacity=0 —
+// so the fast exit applies to every close path (hover-out, tap map, autoClose
+// when another popup opens).
+map.on('popupclose', e => {
+  const el = e.popup.getElement();
+  if (el) el.classList.add('pop-closing');
 });
 
 /* ===================== off-screen station indicators ===================== */

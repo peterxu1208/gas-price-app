@@ -523,6 +523,23 @@ function updateEdgeIndicators() {
   const occ = chipOccluders();
   const best = cheapest();
   const seen = new Set();
+  const placed = [];   // this frame's chips; positioned in bulk after de-overlap
+
+  // Keep a chip inside the box and out from under the toolbar/home group.
+  // Also flags WHICH axis got clamped: the de-overlap pass must spread
+  // edge-pinned chips along the free axis, or the clamp just snaps them back
+  // (top-row chips pushed apart vertically re-collapse onto the edge line).
+  function constrain(c) {
+    const nx = Math.max(box.left + 10, Math.min(box.right - 10, c.cxp));
+    let ny = Math.max(box.top + 10, Math.min(box.bottom - 10, c.cyp));
+    c.pinnedX = nx !== c.cxp;
+    c.pinnedY = ny !== c.cyp;
+    occ.forEach(r => {
+      if (nx > r.left - c.w / 2 && nx < r.right + c.w / 2 && ny < r.bottom + c.h / 2 + 10) { ny = r.bottom + c.h / 2 + 10; c.pinnedY = true; }
+    });
+    if (ny > box.bottom - 10) { ny = box.bottom - 10; c.pinnedY = true; }
+    c.cxp = nx; c.cyp = ny;
+  }
 
   visible().forEach(s => {
     const pt = map.latLngToContainerPoint([s.lat, s.lng]);
@@ -532,43 +549,66 @@ function updateEdgeIndicators() {
     let cxp, cyp;
     if (inBox) {
       // Pin is on-screen but hidden BEHIND the toolbar/home group: park the chip
-      // at the station's own x (the occluder push below drops it under the bar),
-      // so it hangs directly beneath the hidden pin instead of flying to an edge.
-      cxp = Math.max(box.left + 10, Math.min(box.right - 10, pt.x));
-      cyp = pt.y;
+      // at the station's own x (constrain() drops it just below the bar), so it
+      // hangs directly beneath the hidden pin instead of flying to an edge.
+      cxp = pt.x; cyp = pt.y;
     } else {
       // direction from view-box center to the off-screen point, clamped to the box edge
       const angle = Math.atan2(pt.y - cy, pt.x - cx);
       const scaleX = (box.right - box.left) / 2 - 18, scaleY = (box.bottom - box.top) / 2 - 18;
       const t = Math.min(scaleX / Math.max(Math.abs(Math.cos(angle)), 1e-6), scaleY / Math.max(Math.abs(Math.sin(angle)), 1e-6));
       cxp = cx + Math.cos(angle) * t; cyp = cy + Math.sin(angle) * t;
-      cxp = Math.max(box.left + 10, Math.min(box.right - 10, cxp));
-      cyp = Math.max(box.top + 10, Math.min(box.bottom - 10, cyp));
     }
-    // a chip may not sit UNDER the toolbar/home group — drop it just below
-    // (34 ≈ half a chip's width, so partial overlaps are caught too)
-    occ.forEach(r => {
-      if (cxp > r.left - 34 && cxp < r.right + 34 && cyp < r.bottom + 24) cyp = r.bottom + 24;
-    });
-    cyp = Math.min(cyp, box.bottom - 10);
 
     const p = priceOf(s, state.grade);
     const isBest = best && s.id === best.id;
-    // arrow points from the chip's FINAL position toward the actual station —
-    // exact even after edge clamps / occluder push-downs
-    const arrowDeg = Math.atan2(pt.y - cyp, pt.x - cxp) * 180 / Math.PI + 90;
-
     // reuse this station's chip if it already exists — just reposition/relabel it
     let rec = edgeChips.get(s.id);
     if (!rec) { rec = makeEdgeChip(); edgeLayer.appendChild(rec.el); edgeChips.set(s.id, rec); }
     rec.station = s;
     rec.el.className = `edge-chip ${s.brand} ${isBest ? 'best' : ''}`;
-    rec.el.style.setProperty('--brand', brandColor(s.brand));   // accent border for known brands
-    rec.el.style.left = cxp + 'px'; rec.el.style.top = cyp + 'px';
-    rec.arrow.style.transform = `rotate(${arrowDeg}deg)`;
+    rec.el.style.setProperty('--brand', brandColor(s.brand));   // accent for known brands
     rec.val.textContent = p == null ? 'N/A' : '$' + p.toFixed(2);
     rec.el.title = `${s.name} · ${s.distanceMi.toFixed(2)} mi — tap to view`;   // .title is plain text, no escaping
     seen.add(s.id);
+    placed.push({ rec, pt, cxp, cyp });
+  });
+
+  // measure real sizes once, AFTER all labels are set (single layout pass)
+  placed.forEach(c => { c.w = c.rec.el.offsetWidth || 80; c.h = c.rec.el.offsetHeight || 28; });
+  placed.forEach(constrain);
+
+  // ---- de-overlap: chips stacked on the same spot hid each other, so you
+  // couldn't tell how many stations were there or tap a specific one (worst on
+  // mobile — no hover, fat pointer). Iteratively push overlapping pairs apart
+  // along the axis of least penetration, re-constraining each round so nothing
+  // escapes the box or slides back under the toolbar. ≤ a few dozen chips, so
+  // the O(n²) pass is nothing.
+  const GAP = 6;
+  for (let iter = 0; iter < 12; iter++) {   // corner piles (pinned on both axes) converge slowest
+    let moved = false;
+    for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) {
+      const a = placed[i], b = placed[j];
+      const dx = b.cxp - a.cxp, dy = b.cyp - a.cyp;
+      const ox = (a.w + b.w) / 2 + GAP - Math.abs(dx);
+      const oy = (a.h + b.h) / 2 + GAP - Math.abs(dy);
+      if (ox <= 0 || oy <= 0) continue;             // not overlapping
+      // axis: min penetration, EXCEPT chips pinned to an edge spread along it
+      const preferX = (a.pinnedY || b.pinnedY) && !(a.pinnedX || b.pinnedX);
+      const preferY = (a.pinnedX || b.pinnedX) && !(a.pinnedY || b.pinnedY);
+      if (preferX || (!preferY && ox < oy)) { const s = (dx >= 0 ? 1 : -1) * ox / 2; a.cxp -= s; b.cxp += s; }
+      else { const s = (dy >= 0 ? 1 : -1) * oy / 2; a.cyp -= s; b.cyp += s; }
+      moved = true;
+    }
+    if (!moved) break;
+    placed.forEach(constrain);
+  }
+
+  // final write; arrow points from the chip's FINAL position toward the actual
+  // station — exact even after clamps, occluder push-downs and de-overlap shifts
+  placed.forEach(c => {
+    c.rec.el.style.left = c.cxp + 'px'; c.rec.el.style.top = c.cyp + 'px';
+    c.rec.arrow.style.transform = `rotate(${Math.atan2(c.pt.y - c.cyp, c.pt.x - c.cxp) * 180 / Math.PI + 90}deg)`;
   });
 
   // retire chips for stations now on-screen or no longer in the active set

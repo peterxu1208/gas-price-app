@@ -337,13 +337,17 @@ function centerPopupOnMobile(marker, targetZoom) {
     // Solve at the TARGET zoom: the popup card is DOM-sized (it doesn't scale
     // with the map), so its center keeps a fixed pixel vector from the marker.
     // Find the map center that lands the popup on the safe-area center.
-    const v = popC.subtract(map.latLngToContainerPoint(marker.getLatLng()));  // marker → popup center
-    const markerDst = safeC.subtract(v);                                      // where the marker must land
+    const mp = map.latLngToContainerPoint(marker.getLatLng());  // pin's on-screen position
+    const v = popC.subtract(mp);                                // marker → popup center
+    const markerDst = safeC.subtract(v);                        // where the marker must land
     const centerPt = map.project(marker.getLatLng(), z).subtract(markerDst.subtract(map.getSize().divideBy(2)));
     const target = map.unproject(centerPt, z);
     const distPx = popC.distanceTo(safeC);
-    if (z === map.getZoom()) {
-      // Same-zoom, on-screen hop → FLAT PAN, like Google Maps' short recenter.
+    // Branch on whether the PIN is visible, not just on zoom: an off-screen pin
+    // should always get the travel flight, even when the zoom is already >= 14.
+    const pinOnScreen = mp.x >= 0 && mp.x <= window.innerWidth && mp.y >= topInset && mp.y <= window.innerHeight;
+    if (z === map.getZoom() && pinOnScreen) {
+      // Same-zoom, ON-SCREEN hop → FLAT PAN, like Google Maps' short recenter.
       // flyTo's van-Wijk arc dips the zoom mid-flight even when start==end zoom
       // (measured: 13 → 12.989 → 13 on a 98px hop), so every frame renders at a
       // fractional zoom — tiles rescale and pin/popup positions re-round per
@@ -351,8 +355,9 @@ function centerPopupOnMobile(marker, targetZoom) {
       // map pane: nothing rescales, nothing shakes. Short distance-scaled beat.
       map.panTo(target, { duration: Math.min(0.8, 0.4 + distPx / 1500), easeLinearity: 0.25 });
     } else {
-      // Zoom-changing flight (edge chips) → keep the Google-style arc. Pacing:
-      // relaxed floor + screen-distance + a beat per zoom level, capped at 1.6s.
+      // Off-screen pin and/or zoom change (edge chips) → the Google-style travel
+      // arc: zoom out → glide → zoom back in. Pacing: relaxed floor +
+      // screen-distance + a beat per zoom level, capped at 1.6s.
       const dz = Math.abs(z - map.getZoom());
       map.flyTo(target, z, { duration: Math.min(1.6, 0.8 + distPx / 2000 + dz * 0.25) });
     }

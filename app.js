@@ -492,16 +492,21 @@ map.on('popupclose', e => {
 // would land under one is dropped to just below it. On mobile the toolbar spans
 // the full width, so this also fixes stations hidden under it having no chip.
 const EDGE_INSET = { top: 12, bottom: PAD.bottom, left: 12, right: 12 };
-function chipOccluders() {
+function rectsOf(sels) {
   const rects = [];
-  for (const sel of ['.topstack', '.home-float']) {
-    const el = document.querySelector(sel);
-    if (!el) continue;
-    const r = el.getBoundingClientRect();
-    if (r.width && r.height) rects.push(r);
+  for (const sel of sels) {
+    document.querySelectorAll(sel).forEach(el => {
+      const r = el.getBoundingClientRect();
+      if (r.width && r.height) rects.push(r);
+    });
   }
   return rects;
 }
+// whole floating UI (regular off-screen chips stay off it entirely)
+function chipOccluders() { return rectsOf(['.topstack', '.home-float']); }
+// just the INTERACTIVE/readable parts — chips parked on the toolbar may sit on
+// the card's whitespace but must never cover these
+function chipControlRects() { return rectsOf(['.searchrow', '.trow.toprow', '.seg', '.brandfilter', '.home-float']); }
 const edgeLayer = document.getElementById('edgeIndicators');
 const edgeChips = new Map();   // station id -> { el, arrow, val, station } reusable chip
 
@@ -521,6 +526,7 @@ function updateEdgeIndicators() {
   const box = { left: EDGE_INSET.left, top: EDGE_INSET.top, right: size.x - EDGE_INSET.right, bottom: size.y - EDGE_INSET.bottom };
   const cx = (box.left + box.right) / 2, cy = (box.top + box.bottom) / 2;
   const occ = chipOccluders();
+  const ctrl = chipControlRects();
   const best = cheapest();
   const seen = new Set();
   const placed = [];   // this frame's chips; positioned in bulk after de-overlap
@@ -541,6 +547,47 @@ function updateEdgeIndicators() {
       occ.forEach(r => {
         if (nx > r.left - c.w / 2 && nx < r.right + c.w / 2 && ny < r.bottom + c.h / 2 + 10) { ny = r.bottom + c.h / 2 + 10; c.pinnedY = true; }
       });
+    } else {
+      // Parked on the toolbar: may sit on card whitespace, but never COVER a
+      // control (search bar, grade/brand buttons, title, home group). Nudge the
+      // minimum distance off each control it touches, considering ONLY exits
+      // that land inside the screen (an "up" exit from the top-anchored search
+      // bar is off-screen — picking it and then clamping put the chip right
+      // back on the control). A few sweeps let a chip escape stacked rows.
+      for (let sweep = 0; sweep < 4; sweep++) {
+        let hit = false;
+        ctrl.forEach(r => {
+          const mx = c.w / 2 + 4, my = c.h / 2 + 4;
+          if (!(nx > r.left - mx && nx < r.right + mx && ny > r.top - my && ny < r.bottom + my)) return;
+          hit = true;
+          const exits = [
+            { x: r.left - mx, y: ny, d: nx - (r.left - mx), ok: r.left - mx >= box.left + 10 },
+            { x: r.right + mx, y: ny, d: (r.right + mx) - nx, ok: r.right + mx <= box.right - 10 },
+            { x: nx, y: r.top - my, d: ny - (r.top - my), ok: r.top - my >= box.top + 10 },
+            { x: nx, y: r.bottom + my, d: (r.bottom + my) - ny, ok: r.bottom + my <= box.bottom - 10 }
+          ].filter(o => o.ok).sort((a, b) => a.d - b.d);
+          if (exits.length) { nx = exits[0].x; ny = exits[0].y; }
+        });
+        if (!hit) break;
+      }
+      // The card's rows are stacked with gaps SMALLER than a chip, so the
+      // min-push can ping-pong between two rows and never escape. If the chip
+      // still touches a control, bail out of the whole UI stack sideways at its
+      // current height (stays next to its pin), or below it if sideways is off-screen.
+      const mX = c.w / 2 + 4, mY = c.h / 2 + 4;
+      if (ctrl.some(r => nx > r.left - mX && nx < r.right + mX && ny > r.top - mY && ny < r.bottom + mY)) {
+        occ.forEach(r => {
+          if (!(nx > r.left - mX && nx < r.right + mX && ny > r.top - mY && ny < r.bottom + mY)) return;
+          const exits = [
+            { x: r.left - mX, y: ny, d: nx - (r.left - mX), ok: r.left - mX >= box.left + 10 },
+            { x: r.right + mX, y: ny, d: (r.right + mX) - nx, ok: r.right + mX <= box.right - 10 },
+            { x: nx, y: r.bottom + mY, d: (r.bottom + mY) - ny, ok: true }
+          ].filter(o => o.ok).sort((a, b) => a.d - b.d);
+          if (exits.length) { nx = exits[0].x; ny = exits[0].y; }
+        });
+      }
+      nx = Math.max(box.left + 10, Math.min(box.right - 10, nx));
+      ny = Math.max(box.top + 10, ny);
     }
     if (ny > box.bottom - 10) { ny = box.bottom - 10; c.pinnedY = true; }
     c.cxp = nx; c.cyp = ny;
@@ -549,7 +596,12 @@ function updateEdgeIndicators() {
   visible().forEach(s => {
     const pt = map.latLngToContainerPoint([s.lat, s.lng]);
     const inBox = pt.x >= box.left && pt.x <= box.right && pt.y >= box.top && pt.y <= box.bottom;
-    const behindUi = occ.some(r => pt.x >= r.left && pt.x <= r.right && pt.y >= r.top && pt.y <= r.bottom);
+    // hidden test uses the pin's ANCHOR and its VISUAL midpoint (the icon rises
+    // ~52px above the anchor): a pin whose price tag is behind the toolbar but
+    // whose base pokes out is unreadable — it needs a chip too
+    const midY = pt.y - 26;
+    const behindUi = occ.some(r => pt.x >= r.left && pt.x <= r.right &&
+      ((pt.y >= r.top && pt.y <= r.bottom) || (midY >= r.top && midY <= r.bottom)));
     if (inBox && !behindUi) return;  // genuinely visible: no chip
     let cxp, cyp;
     if (inBox) {

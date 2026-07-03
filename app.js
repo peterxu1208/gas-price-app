@@ -760,12 +760,20 @@ function bindSeg(id, key) {
 }
 bindSeg('gradeSeg', 'grade');   // brand is a multi-select checkbox group, built by renderBrandFilter()
 
-/* ---- radius slider: value label live while dragging; one re-fetch on release
-   ('change', not 'input' — dragging must not spam the stations API). ---- */
+/* ---- radius slider: value label + track fill live while dragging; one
+   re-fetch on release ('change', not 'input' — dragging must not spam the
+   stations API). --pct drives the CSS gradient that paints the filled track. ---- */
 const radiusSlider = document.getElementById('radiusSlider');
 const radiusValEl = document.getElementById('radiusVal');
 const radiusLabel = mi => (Number.isInteger(mi) ? mi : mi.toFixed(1)) + ' mi';
-radiusSlider.addEventListener('input', () => { radiusValEl.textContent = radiusLabel(parseFloat(radiusSlider.value)); });
+function syncRadiusUI() {
+  const mi = parseFloat(radiusSlider.value);
+  radiusValEl.textContent = radiusLabel(mi);
+  const lo = parseFloat(radiusSlider.min), hi = parseFloat(radiusSlider.max);
+  radiusSlider.style.setProperty('--pct', ((mi - lo) / (hi - lo) * 100).toFixed(2) + '%');
+}
+syncRadiusUI();
+radiusSlider.addEventListener('input', syncRadiusUI);
 radiusSlider.addEventListener('change', () => {
   radiusM = Math.round(parseFloat(radiusSlider.value) * MI_TO_M);
   goToPlace(origin);   // re-fetch the current place at the new radius (re-frames to fit)

@@ -105,10 +105,38 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
    Lives with the other result-shaping controls (grade/brand): it changes which
    stations are fetched. Compact one-liner so it costs minimal card height on
    mobile. Deliberately NOT persisted — every load starts at the 2.5 mi default. */
-.radiusrow{display:flex;align-items:center;gap:9px}
-.radius-lb{font-family:'Poppins',sans-serif;font-size:var(--fs-xs);letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);flex:none}
-.radius-val{font-family:'Poppins',sans-serif;font-size:var(--fs-xs);font-weight:600;color:var(--txt);flex:none;min-width:44px;text-align:right}
-#radiusSlider{flex:1 1 auto;min-width:0;height:22px;margin:0;accent-color:var(--fresh);cursor:pointer}
+.radiusrow{display:flex;align-items:flex-start;gap:9px}
+.radius-lb{font-family:'Poppins',sans-serif;font-size:var(--fs-xs);letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);flex:none;line-height:22px}
+.radius-val{font-family:'Poppins',sans-serif;font-size:var(--fs-xs);font-weight:600;color:var(--txt);flex:none;min-width:44px;text-align:right;line-height:22px}
+.radius-slider-wrap{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+/* Custom-drawn slider (appearance:none): step is 0.1 so the thumb tracks the
+   finger/cursor near-continuously instead of snapping in 0.5 jumps, the thumb
+   grows on grab (transform only — thumb POSITION is never transitioned, it must
+   follow the pointer 1:1), and the track fill is a gradient driven by --pct
+   (kept in sync by app.js on every input event). */
+#radiusSlider{-webkit-appearance:none;appearance:none;width:100%;height:22px;margin:0;
+  background:transparent;cursor:pointer;--pct:44.44%}
+#radiusSlider::-webkit-slider-runnable-track{height:4px;border-radius:2px;
+  background:linear-gradient(to right,var(--fresh) var(--pct),var(--line) var(--pct))}
+#radiusSlider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;margin-top:-6px;
+  border-radius:50%;background:#fff;border:2px solid var(--fresh);
+  box-shadow:0 1px 4px rgba(40,42,48,.25);transition:transform .15s cubic-bezier(.16,1,.3,1)}
+#radiusSlider:active::-webkit-slider-thumb{transform:scale(1.25)}
+#radiusSlider::-moz-range-track{height:4px;border-radius:2px;background:var(--line)}
+#radiusSlider::-moz-range-progress{height:4px;border-radius:2px;background:var(--fresh)}
+#radiusSlider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;
+  border:2px solid var(--fresh);box-shadow:0 1px 4px rgba(40,42,48,.25);transition:transform .15s}
+#radiusSlider:active::-moz-range-thumb{transform:scale(1.25)}
+/* mile breakpoints under the track: small vertical tick + label, positioned to
+   match the thumb's travel (thumb is 16px wide, so its center spans
+   [8px … 100%-8px], not the full track width). The 2.5 default is green+bold. */
+.radius-scale{position:relative;height:15px}
+.rtick{position:absolute;top:0;left:calc((100% - 16px)*var(--p) + 8px);transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:1px;
+  font-family:'Poppins',sans-serif;font-size:9px;line-height:1;color:var(--muted-2)}
+.rtick i{display:block;width:1.5px;height:4px;background:var(--line-bright)}
+.rtick.def{color:var(--fresh);font-weight:700}
+.rtick.def i{width:2px;height:5px;background:var(--fresh)}
 
 /* ---------- home control (a compact pill beside the toolbar) ---------- */
 .home-float{pointer-events:auto;display:flex;align-items:center;gap:6px}

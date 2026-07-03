@@ -769,6 +769,7 @@ const radiusLabel = mi => (Number.isInteger(mi) ? mi : mi.toFixed(1)) + ' mi';
 function syncRadiusUI() {
   const mi = parseFloat(radiusSlider.value);
   radiusValEl.textContent = radiusLabel(mi);
+  radiusValEl.classList.toggle('at-default', Math.abs(mi - RADIUS_DEFAULT_MI) < 0.001);
   const lo = parseFloat(radiusSlider.min), hi = parseFloat(radiusSlider.max);
   radiusSlider.style.setProperty('--pct', ((mi - lo) / (hi - lo) * 100).toFixed(2) + '%');
 }

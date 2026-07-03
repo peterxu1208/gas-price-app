@@ -101,6 +101,15 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
   border:1px solid var(--line-crisp);border-radius:15px;padding:11px 13px;box-shadow:var(--shadow-float);
   display:flex;flex-direction:column;gap:9px;max-width:100%}
 
+/* ---------- radius slider (bottom row of the toolbar card) ----------
+   Lives with the other result-shaping controls (grade/brand): it changes which
+   stations are fetched. Compact one-liner so it costs minimal card height on
+   mobile. Deliberately NOT persisted — every load starts at the 2.5 mi default. */
+.radiusrow{display:flex;align-items:center;gap:9px}
+.radius-lb{font-family:'Poppins',sans-serif;font-size:var(--fs-xs);letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);flex:none}
+.radius-val{font-family:'Poppins',sans-serif;font-size:var(--fs-xs);font-weight:600;color:var(--txt);flex:none;min-width:44px;text-align:right}
+#radiusSlider{flex:1 1 auto;min-width:0;height:22px;margin:0;accent-color:var(--fresh);cursor:pointer}
+
 /* ---------- home control (a compact pill beside the toolbar) ---------- */
 .home-float{pointer-events:auto;display:flex;align-items:center;gap:6px}
 .home-chip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;
@@ -369,7 +378,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
      overflow-x:auto on the brand row does its job instead. */
   .topcard{width:100%;border-radius:14px;padding:9px 11px 10px;
     display:grid;grid-template-columns:minmax(0,1fr);row-gap:12px;
-    grid-template-areas:"title" "grade" "brand"}
+    grid-template-areas:"title" "grade" "brand" "radius"}
   /* Address + freshness share one row (title's own full-width row now that it
      no longer splits space with the grade buttons); grade drops to its own
      full-width row below, so each of its 3 buttons gets real tap-target size
@@ -380,6 +389,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
   .ttl h1{-webkit-line-clamp:1}
   .graderow{grid-area:grade}
   .brandrow{grid-area:brand;margin-top:0}
+  .radiusrow{grid-area:radius}
   /* single swipeable row instead of wrapping across ~5 lines */
   .brandfilter{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:1px}
   .brandfilter::-webkit-scrollbar{display:none}

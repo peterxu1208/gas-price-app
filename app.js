@@ -24,6 +24,12 @@ const { NOW, HOME } = window.FuelData;
 let DATA = [];
 let origin = { lat: HOME.lat, lng: HOME.lng, label: 'Hope Ave', fullLabel: '60 Hope Ave, Waltham, MA', isHome: true };
 
+// Search radius around the origin, set by the toolbar slider. Deliberately NOT
+// persisted: every page load starts back at the 2.5 mi default.
+const MI_TO_M = 1609.34;
+const RADIUS_DEFAULT_MI = 2.5;
+let radiusM = Math.round(RADIUS_DEFAULT_MI * MI_TO_M);
+
 // Padding (px) reserved for the floating toolbar card when framing the map.
 // `top` is a fixed compromise for DESKTOP (card only covers the top-left);
 // on mobile the toolbar spans the full width and its real height varies, so
@@ -754,6 +760,17 @@ function bindSeg(id, key) {
 }
 bindSeg('gradeSeg', 'grade');   // brand is a multi-select checkbox group, built by renderBrandFilter()
 
+/* ---- radius slider: value label live while dragging; one re-fetch on release
+   ('change', not 'input' — dragging must not spam the stations API). ---- */
+const radiusSlider = document.getElementById('radiusSlider');
+const radiusValEl = document.getElementById('radiusVal');
+const radiusLabel = mi => (Number.isInteger(mi) ? mi : mi.toFixed(1)) + ' mi';
+radiusSlider.addEventListener('input', () => { radiusValEl.textContent = radiusLabel(parseFloat(radiusSlider.value)); });
+radiusSlider.addEventListener('change', () => {
+  radiusM = Math.round(parseFloat(radiusSlider.value) * MI_TO_M);
+  goToPlace(origin);   // re-fetch the current place at the new radius (re-frames to fit)
+});
+
 // bounds covering the origin + every active station — reused for framing and the home button
 const currentBounds = () => L.latLngBounds([...DATA.map(s => [s.lat, s.lng]), [origin.lat, origin.lng]]);
 
@@ -828,7 +845,7 @@ async function runSearch(query) {
     const place = await FuelServices.geocode(q);
     if (!place) { flash(`No place found for “${q}”.`); updateFreshness(); return; }
     setStamp('finding stations…');
-    const stations = await FuelServices.findStationsNear(place.lat, place.lng);
+    const stations = await FuelServices.findStationsNear(place.lat, place.lng, radiusM);
     if (!stations.length) flash(`No gas stations found near ${place.label}.`);
     setActiveSet(stations, { lat: place.lat, lng: place.lng, label: place.label, fullLabel: place.full, isHome: false });
     document.getElementById('searchInput').value = ''; syncSearchClear();   // search done → empty the box
@@ -874,7 +891,7 @@ function renderHomeChip() {
 async function goToPlace(o) {
   setBusy(true); setStamp('finding stations…');
   try {
-    const stations = await FuelServices.findStationsNear(o.lat, o.lng);
+    const stations = await FuelServices.findStationsNear(o.lat, o.lng, radiusM);
     if (!stations.length) flash(`No gas stations found near ${o.label}.`);
     setActiveSet(stations, o);
   } catch (err) {
@@ -982,7 +999,7 @@ async function boot() {
     }
   }
   try {
-    DATA = await FuelServices.findStationsNear(origin.lat, origin.lng);
+    DATA = await FuelServices.findStationsNear(origin.lat, origin.lng, radiusM);
   } catch (e) {
     // No fake-data fallback: show an explicit, honest failure rather than
     // sample prices that would read as live. Map stays empty; stamp → "no data".

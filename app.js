@@ -701,6 +701,18 @@ function updateEdgeIndicators() {
 
   // retire chips for stations now on-screen or no longer in the active set
   edgeChips.forEach((rec, id) => { if (!seen.has(id)) { rec.el.remove(); edgeChips.delete(id); } });
+
+  // A station never shows BOTH its pin and a direction chip: while the toolbar
+  // covers a pin (its chip is the readable, tappable stand-in), the pin itself
+  // hides; it returns as soon as the chip retires (pan away / fly to it).
+  // Truly off-screen stations aren't affected — their pins aren't visible anyway.
+  const chipOwned = new Set(placed.filter(c => c.overUi).map(c => c.rec.station.id));
+  for (const id in markerById) {
+    const el = markerById[id].getElement();
+    if (!el) continue;
+    const want = chipOwned.has(id);
+    if (el.classList.contains('chip-owned') !== want) el.classList.toggle('chip-owned', want);
+  }
 }
 
 function setActiveFromEdge(s) {

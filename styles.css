@@ -57,6 +57,12 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Poppins
    toolbar in that case — regular off-screen chips are kept off it). The locate
    button + map badge sit at 1002 so chips never cover them. */
 #edgeIndicators{position:absolute;inset:0;z-index:1001;pointer-events:none}
+/* A pin whose station currently has a direction chip (toolbar covers the pin)
+   hides so the station isn't shown twice; app.js toggles this per frame and
+   removes it as soon as the chip retires. Fade keeps the swap gentle. */
+.leaflet-marker-icon.chip-owned{opacity:0!important;pointer-events:none!important}
+.leaflet-marker-icon{transition:opacity .16s}
+
 /* Positioned by app.js via inline transform (compositor-only, runs every map
    frame) — so transform must NOT be transitioned or hover-overridden here:
    a transform transition smears the per-frame position updates (chips lag the

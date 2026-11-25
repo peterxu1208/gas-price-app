@@ -36,6 +36,7 @@ Leaflet (CDN) → `data.js` → `services.js` → `app.js`.
 | Data boundary | `services.js` | `window.FuelServices` — the **only** file that makes network calls. Converts proxy results into the app's station shape |
 | App logic | `app.js` | Map, tiles, pins, popups, edge chips, filters, radius, search, home, boot. Reads data only via `FuelServices` |
 | Proxy | `api/stations.js`, `api/geocode.js` | Vercel serverless functions that call Google with the server-side key |
+| Chat proxy | `api/chat.js` | Vercel function that runs the map-chat LLM (OpenAI `gpt-6-luna`) and returns a reply + map actions |
 | Dev tool | `_selfcheck.js` | UI invariant checker; not loaded by the app (see below) |
 
 ### The `services.js` boundary
@@ -46,6 +47,8 @@ All outside calls go through `window.FuelServices`:
 - `reverseGeocode(lat, lng)` → `GET /api/geocode?latlng=` → same shape or `null`; never throws
 - `findStationsNear(lat, lng, radiusM)` → `GET /api/stations?lat=&lng=&radius=` → station array sorted by distance
 - `getCurrentPosition()` → browser geolocation (free, no key) → `{lat, lng}`; rejects with the browser error (`code 1` = permission denied)
+- `chat(payload)` → `POST /api/chat` → `{status, data}` (status returned so the UI can tell a wrong passcode from other failures)
+- `fromRaw(raw, lat, lng)` → the `toStation()` converter, exposed for chat actions that carry raw proxy stations
 - `getHomeStations()` → stations around the Waltham seed. **Not called anywhere** (leftover)
 - `configure({classify, distMi})` → `app.js` injects the brand classifier and distance function so the brand registry and its colors stay in the UI layer
 
@@ -194,6 +197,77 @@ hidden. Overlapping chips are pushed apart. Clicking a chip flies to the station
 (zoom ≥ 14) and opens its card. Recomputed at most once per animation frame during
 pan/zoom, and on every filter change.
 
+## Map chat (LLM assistant) — added 2026-11-24
+
+**Goal:** chat with an LLM in the page; it answers in text *and* drives the map
+(moves, frames results, switches grade/brands, opens station cards), like asking
+Google Maps. Built for personal use and a classroom demo, not mass use.
+
+**Decisions**
+- **Provider: OpenAI `gpt-6-luna`** (chosen by the user after comparing Claude,
+  OpenAI and Gemini on cost/viability). $0.10 / $0.50 per 1M tokens; ~8K input
+  tokens per question measured in tests → ~$0.001/question. Called with **raw
+  `fetch` to the Responses API** (`POST /v1/responses`) — no SDK, so the project
+  still has no `package.json`/build step. Model and reasoning effort are env vars
+  (`OPENAI_MODEL`, `OPENAI_REASONING_EFFORT`, default `low`), so swapping models
+  needs no code change.
+- **Passcode required** (`CHAT_PASSCODE` env var). The site is public; without a gate
+  anyone could spend the OpenAI credit. The browser saves it per device
+  (`localStorage['fuelChatPass']`); a 401 clears it and re-prompts. Also set a
+  monthly budget in the OpenAI dashboard.
+- **Cost guards in `api/chat.js`:** ≤6 model rounds and ≤6 data lookups per
+  question, `max_output_tokens: 3000` (includes reasoning), last 12 messages only,
+  2,000 chars per message, map context capped at 12K chars.
+- **OpenAI `store` left at its default (true):** OpenAI keeps request data 30 days.
+  The documented tool loop passes the model's output items (incl. reasoning items)
+  back in `input`; `store:false` would need encrypted reasoning content — not worth
+  it for this app.
+
+**How it works**
+1. Browser (`app.js` chat section) sends `{passcode, messages, map_context}` via
+   `FuelServices.chat()` → `POST /api/chat`. `map_context` = current place, radius,
+   grade, brands shown, and up to 25 on-map stations with prices — so "zoom to the
+   cheapest one" works without a new search.
+2. `api/chat.js` runs the tool loop with OpenAI. Two kinds of tools:
+   - **Data tools run on the server:** `find_place` and `find_stations` call this
+     site's own `/api/geocode` and `/api/stations` over HTTP, so they share their edge
+     cache and Google guardrails (no duplicated Google code).
+   - **Map tools are NOT executed server-side:** `show_search_results`,
+     `set_fuel_grade`, `set_brand_filter`, `focus_station` are recorded as `actions`
+     and returned. `show_search_results` carries the raw stations from the search.
+3. Browser applies actions with the same functions the manual controls use
+   (`setActiveSet`, grade/brand state, popups). Order matters and is enforced:
+   show results → brand filter → grade → focus a station.
+
+**Non-obvious details (read before touching)**
+- **Focus timing:** a grade/brand change re-renders pins with a crossfade; the old
+  markers are cleared ~65 ms later, which closes any card opened right away. So
+  focus runs 150 ms later — or after the map flight (`afterFlight`: `moveend`, with a
+  1.2 s fallback) when results were shown.
+- **Hidden brand:** focusing a station whose brand is filtered out (e.g. an "Other")
+  turns that brand on first, or there'd be no marker to open.
+- **Desktop card placement:** chat-opened cards can land under the toolbar or chat
+  panel (hover cards have `autoPan:false` on purpose). `keepCardVisible()` measures
+  the card and pans the map just enough to clear them.
+- **The panel is part of the framing math:** `chatRightInset()` (desktop column) and
+  `chatBottomInset()` (phone sheet) feed result framing (`setActiveSet`), mobile
+  popup centering, and the edge-chip box, so results aren't hidden under it.
+- **Phone "peek":** the full sheet (46vh) leaves too little room between it and the
+  toolbar for a station card (~194 px), so when the chat moves the map the sheet
+  shrinks to the latest reply + input (`.chat-panel.peek`) *before* framing. Tapping
+  the reply, header or input expands it. On phones the input is blurred after
+  sending (closes the keyboard) and not refocused, or it would un-peek immediately.
+  The "near me" button is hidden while the phone sheet is open (it's underneath).
+- **Instructions:** the system prompt in `api/chat.js` forbids stating any price not
+  in tool results / map context, and lists the brand keys and grade enums.
+
+**Testing without Node:** the server function was tested by importing
+`api/chat.js` into the browser with a stubbed `process.env` and a fake OpenAI
+`fetch` (happy path, wrong passcode, missing config, OpenAI error, runaway loop),
+and the UI with a small local Python server that proxies `/api/stations` +
+`/api/geocode` to the live site and fakes `/api/chat`. The real OpenAI call was not
+exercised until deployment.
+
 ## Non-obvious implementation details (read before touching)
 
 - **Hover card timing:** open after **40 ms** dwell (`HOVER_OPEN_MS`), close after
@@ -275,6 +349,9 @@ Add a check for each new layout bug so it can't come back.
 
 ## Not done yet (optional next steps)
 
+0. **Chat vs. search UI** — the user may later separate the chat from the strict
+   address search with tabs; the chat panel is self-contained, so this is a layout
+   change only.
 1. **Autocomplete in the search and set-home fields** — planned and deferred; uses
    Google Place Autocomplete via a new `api/autocomplete.js`, ZIP codes skip it.
 2. **Google basemap (optional).** Would need the Maps JavaScript API with a

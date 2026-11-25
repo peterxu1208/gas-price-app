@@ -109,5 +109,23 @@
     } catch (e) { return null; }
   }
 
-  window.FuelServices = { configure, getHomeStations, geocode, findStationsNear, getCurrentPosition, reverseGeocode };
+  /* ---- MAP CHAT: one question → { status, data } ----
+     POSTs to the /api/chat proxy (OpenAI key stays server-side). Returns the HTTP
+     status alongside the JSON so the UI can tell "wrong passcode" (401) from other
+     failures. data on 200: { reply, actions:[…], usage }. */
+  async function chat(payload) {
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    let data = null;
+    try { data = await r.json(); } catch (e) {}
+    return { status: r.status, data };
+  }
+
+  window.FuelServices = {
+    configure, getHomeStations, geocode, findStationsNear, getCurrentPosition, reverseGeocode, chat,
+    fromRaw: toStation,   // raw proxy station → app station (chat actions carry raw stations)
+  };
 })();

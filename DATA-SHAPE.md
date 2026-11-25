@@ -91,6 +91,34 @@ back sorted by `distanceMi`, nearest first.
 - Returns `null` (HTTP 200) when nothing matches. Other Google statuses → 502 with
   `{ error: 'geocode <STATUS>', message }`.
 
+## 3b. Map chat — `POST /api/chat`
+
+Request:
+```js
+{ passcode: '…',
+  messages: [{ role: 'user' | 'assistant', content: 'text' }, …],   // newest last, must end with 'user'
+  map_context: { place, full_address, center:{lat,lng}, radius_miles, grade_shown,
+                 brands_shown:[…], stations:[{ id, name, brand, distance_mi, open_now,
+                 shown, prices:{GRADE: price}, newest_price_hours_old }] } }
+```
+
+Response 200:
+```js
+{ reply: 'The cheapest premium near Fenway is Shell at $4.75.',
+  actions: [   // applied by app.js in this order: show → brands → grade → focus
+    { type: 'show_search_results', origin:{lat,lng,label}, radius_miles, stations:[<proxy station>…], focus_station_id: id|null },
+    { type: 'set_brand_filter', brands: ['shell','mobil', …, 'other'] },
+    { type: 'set_fuel_grade', grade: 'REGULAR_UNLEADED' | 'MIDGRADE' | 'PREMIUM' },
+    { type: 'focus_station', station_id: id },
+  ],
+  usage: { input_tokens, output_tokens, rounds, lookups } }
+```
+Errors: 401 `{error:'passcode'}` · 400 bad messages · 405 not POST · 500 env vars
+missing · 502 OpenAI/lookup failure (`{error, message}`).
+
+`show_search_results.stations` are **proxy stations** (shape 1); the browser converts
+them with `FuelServices.fromRaw(raw, originLat, originLng)` (= `toStation()`).
+
 ## 4. Saved home — `localStorage['fuelHome']`
 
 ```js

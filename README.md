@@ -23,10 +23,11 @@ No build step: `index.html` loads Leaflet (CDN), then `data.js`, `services.js`,
 | `index.html` | Markup: map, search bar, toolbar card, home chip + gear, "near me" button, set-home modal |
 | `styles.css` | All styling. Font sizes are tokens in `:root` (`--fs-lg/base/sm/xs` = 18/16/14/12); mobile layout at ≤640 px |
 | `data.js` | `HOME` (Waltham fallback point) and `NOW` (page-load time). Also the old 7-station sample data, now unused |
-| `services.js` | The only file that makes network calls: `geocode`, `reverseGeocode`, `findStationsNear`, `getCurrentPosition` |
-| `app.js` | Everything else: map + tiles, pins, cards, edge chips, filters, radius, search, home, startup |
+| `services.js` | The only file that makes network calls: `geocode`, `reverseGeocode`, `findStationsNear`, `getCurrentPosition`, `chat` |
+| `app.js` | Everything else: map + tiles, pins, cards, edge chips, filters, radius, search, home, map chat panel, startup |
 | `api/stations.js` | Vercel function → Google Places API (New) nearby gas stations with `fuelOptions` prices |
 | `api/geocode.js` | Vercel function → Google Geocoding API (search and reverse) |
+| `api/chat.js` | Vercel function → OpenAI (`gpt-6-luna`) for the map chat; runs the tool loop, returns a reply + map actions |
 | `_selfcheck.js` | Dev-only UI checker, not loaded by the app (see `DECISIONS.md`) |
 | `Start Hope Ave Fuel.bat` | Local static server on port 8753 — UI only, no live data |
 | `docs-archive/` | Previous versions of these notes (July 2026) |
@@ -45,6 +46,12 @@ No build step: `index.html` loads Leaflet (CDN), then `data.js`, `services.js`,
 - **Pins** — hover (desktop) or tap (phone) for all grades, freshness, Open/Closed,
   and NAVIGATE. The cheapest gets a ◆ CHEAPEST crown. Stations off-screen or
   hidden under the toolbar show arrow chips at the edge.
+
+- **Chat button** (green, above the bottom-right button) — "Ask the map": ask in
+  plain English ("cheapest premium near Fenway Park?", "show only Shell"). It
+  answers in text and moves the map, sets grade/brand filters and opens station
+  cards. Asks for the chat passcode once per device. On phones, the sheet shrinks to
+  the latest reply after the map moves; tap it to expand.
 
 On first open with no saved home, the app asks for your location; if you decline,
 it opens on 60 Hope Ave, Waltham.
@@ -82,3 +89,22 @@ Quick health check: open
 `https://gas-price-app-nu.vercel.app/api/geocode?q=Waltham` — a JSON place means
 Google is connected; an `error` like `geocode REQUEST_DENIED` includes Google's
 reason.
+
+## Map chat setup (OpenAI)
+
+The chat calls OpenAI from `api/chat.js`; the key never reaches the browser. In
+Vercel → Project → Settings → Environment Variables (Production), set:
+
+| Variable | Required | What |
+|---|---|---|
+| `OPENAI_API_KEY` | yes | From platform.openai.com → API keys |
+| `CHAT_PASSCODE` | yes | Any passcode you choose; the chat refuses to run without one so the public URL can't spend your credit |
+| `OPENAI_MODEL` | no | Default `gpt-6-luna` |
+| `OPENAI_REASONING_EFFORT` | no | Default `low` (`none`/`low`/`medium`/`high`) |
+
+Env vars only apply to deployments made **after** they're set — add them, then
+commit/redeploy. In the OpenAI dashboard, set a monthly **budget limit**. Cost at
+`gpt-6-luna` prices ($0.10 / $0.50 per 1M tokens): a typical question uses ~8K input
+tokens → about $0.001. OpenAI keeps request data for 30 days by default (`store`).
+If the chat says "passcode didn't work", the device's saved passcode is cleared and
+it asks again.

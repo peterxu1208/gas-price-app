@@ -42,6 +42,16 @@ function framePadTop() {
   }
   return PAD.top;
 }
+// Space the open chat panel covers, so framing / popup centering / edge chips
+// keep results out from under it. Desktop: a column at the bottom-right → right
+// inset. Mobile: a full-width sheet at the bottom → bottom inset. 0 when closed.
+function chatRect() {
+  const p = document.getElementById('chatPanel');
+  return p && !p.hidden ? p.getBoundingClientRect() : null;
+}
+const IS_MOBILE_W = () => window.matchMedia('(max-width:640px)').matches;
+function chatRightInset() { const r = chatRect(); return r && !IS_MOBILE_W() ? Math.round(window.innerWidth - r.left) : 0; }
+function chatBottomInset() { const r = chatRect(); return r && IS_MOBILE_W() ? Math.round(window.innerHeight - r.top) : 0; }
 
 const GLAB = { REGULAR_UNLEADED: 'Reg', MIDGRADE: 'Mid', PREMIUM: 'Prem', DIESEL: 'Dies' };
 const GFULL = { REGULAR_UNLEADED: 'Regular', MIDGRADE: 'Midgrade', PREMIUM: 'Premium', DIESEL: 'Diesel' };
@@ -382,7 +392,7 @@ function centerPopupOnMobile(marker, targetZoom) {
     const topInset = toolbar ? toolbar.getBoundingClientRect().bottom : 0;
     const z = targetZoom == null ? map.getZoom() : targetZoom;
     const popC = L.point(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    const safeC = L.point(window.innerWidth / 2, (topInset + window.innerHeight) / 2);
+    const safeC = L.point(window.innerWidth / 2, (topInset + window.innerHeight - chatBottomInset()) / 2);
     if (z === map.getZoom() && Math.abs(popC.x - safeC.x) <= 2 && Math.abs(popC.y - safeC.y) <= 2) return;
     // Solve at the TARGET zoom: the popup card is DOM-sized (it doesn't scale
     // with the map), so its center keeps a fixed pixel vector from the marker.
@@ -566,7 +576,11 @@ function makeEdgeChip() {
 function updateEdgeIndicators() {
   if (!map) return;
   const size = map.getSize();
-  const box = { left: EDGE_INSET.left, top: EDGE_INSET.top, right: size.x - EDGE_INSET.right, bottom: size.y - EDGE_INSET.bottom };
+  // the open chat panel shrinks the box: pins under it count as off-screen and
+  // their chips park at its edge instead of underneath it
+  const box = { left: EDGE_INSET.left, top: EDGE_INSET.top,
+    right: size.x - Math.max(EDGE_INSET.right, chatRightInset() + 12),
+    bottom: size.y - Math.max(EDGE_INSET.bottom, chatBottomInset() + 12) };
   const cx = (box.left + box.right) / 2, cy = (box.top + box.bottom) / 2;
   const occ = chipOccluders();
   const best = cheapest();
@@ -858,7 +872,7 @@ function setActiveSet(stations, newOrigin, { frame = true } = {}) {
   renderOrigin();
   render();                     // crossfade markers + recompute edge chips + freshness stamp
   if (frame) {
-    if (stations.length) map.flyToBounds(currentBounds(), { paddingTopLeft: [PAD.side, framePadTop()], paddingBottomRight: [PAD.side, PAD.bottom], duration: .6, maxZoom: 16 });
+    if (stations.length) map.flyToBounds(currentBounds(), { paddingTopLeft: [PAD.side, framePadTop()], paddingBottomRight: [PAD.side + chatRightInset(), PAD.bottom + chatBottomInset()], duration: .6, maxZoom: 16 });
     else map.flyTo([origin.lat, origin.lng], 14, { duration: .6 });
   }
 }
@@ -1016,6 +1030,221 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.
 document.getElementById('homeInput').addEventListener('input', syncHomeInputClear);
 document.getElementById('homeInputClear').addEventListener('click', () => { const inp = document.getElementById('homeInput'); inp.value = ''; syncHomeInputClear(); inp.focus(); });
 document.getElementById('homeEditForm').addEventListener('submit', e => { e.preventDefault(); submitHome(document.getElementById('homeInput').value); });
+
+/* ===================== map chat (LLM assistant) =====================
+   A chat panel (bottom-right) that sends the conversation + a snapshot of what's
+   on the map to /api/chat (via FuelServices.chat). The server runs the LLM tool
+   loop and returns { reply, actions }; this section applies the actions with the
+   SAME functions the manual controls use (setActiveSet, grade/brand state,
+   popups), so the chat drives the map exactly like a user would.
+   Passcode: the server requires one (keeps the public URL from running up the
+   OpenAI bill). Saved per device in localStorage after the first successful use. */
+const CHAT_PASS_KEY = 'fuelChatPass';
+const chatEls = {
+  fab: document.getElementById('chatToggle'), panel: document.getElementById('chatPanel'),
+  close: document.getElementById('chatClose'), log: document.getElementById('chatLog'),
+  form: document.getElementById('chatForm'), input: document.getElementById('chatInput'),
+  send: document.getElementById('chatSend'),
+  passForm: document.getElementById('chatPassForm'), pass: document.getElementById('chatPass'),
+};
+const chatHistory = [];   // [{ role: 'user'|'assistant', content }] — text turns only
+let chatPending = null;   // question waiting on a passcode
+let chatBusy = false;
+function getChatPass() { try { return localStorage.getItem(CHAT_PASS_KEY) || ''; } catch (e) { return ''; } }
+function setChatPass(v) { try { v ? localStorage.setItem(CHAT_PASS_KEY, v) : localStorage.removeItem(CHAT_PASS_KEY); } catch (e) {} }
+
+function chatBubble(role, text) {
+  const hint = chatEls.log.querySelector('.chat-hints'); if (hint) hint.remove();
+  const d = document.createElement('div');
+  d.className = 'chat-msg ' + role;   // user | assistant | note | thinking
+  d.textContent = text;
+  chatEls.log.appendChild(d);
+  chatEls.log.scrollTop = chatEls.log.scrollHeight;
+  return d;
+}
+function setChatOpen(open) {
+  chatEls.panel.hidden = !open;
+  chatEls.fab.hidden = open;
+  chatEls.fab.setAttribute('aria-expanded', String(open));
+  document.body.classList.toggle('chat-open', open);   // CSS hides the locate button under the phone sheet
+  if (open) { (chatEls.passForm.hidden ? chatEls.input : chatEls.pass).focus(); }
+  scheduleEdgeUpdate();   // the panel changes the free map area
+}
+function setChatPeek(on) {
+  if (chatEls.panel.classList.contains('peek') === on) return;
+  chatEls.panel.classList.toggle('peek', on);
+  chatEls.log.scrollTop = chatEls.log.scrollHeight;
+  scheduleEdgeUpdate();
+}
+function setChatBusy(b) {
+  chatBusy = b;
+  chatEls.input.disabled = b; chatEls.send.disabled = b;
+  chatEls.panel.classList.toggle('busy', b);
+}
+
+// Snapshot of what the user sees, so "zoom to the cheapest one" or "what about
+// regular?" can be answered without a new search.
+function mapContext() {
+  return {
+    place: origin.label, full_address: origin.fullLabel, center: { lat: +origin.lat.toFixed(5), lng: +origin.lng.toFixed(5) },
+    radius_miles: +(radiusM / MI_TO_M).toFixed(1),
+    grade_shown: state.grade,
+    brands_shown: [...state.brands],
+    stations: DATA.slice(0, 25).map(s => ({
+      id: s.id, name: s.name, brand: s.brand, distance_mi: +s.distanceMi.toFixed(2), open_now: s.openNow,
+      shown: state.brands.has(s.brand),
+      prices: Object.fromEntries(GORD.map(g => [g, priceOf(s, g)]).filter(([, v]) => v != null)),
+      newest_price_hours_old: s.fuelPrices.length ? Math.round((NOW - Math.max(...s.fuelPrices.map(p => Date.parse(p.updateTime)))) / 36e5) : null,
+    })),
+  };
+}
+
+function setGrade(g) {
+  if (!GORD.includes(g)) return;
+  state.grade = g;
+  [...document.getElementById('gradeSeg').children].forEach(c => c.classList.toggle('on', c.dataset.grade === g));
+  render();
+}
+// Open a station's card: in place if its pin is on screen, else fly to it.
+function openStationCard(id) {
+  const s = DATA.find(x => x.id === id);
+  if (!s) return;
+  if (!state.brands.has(s.brand)) { state.brands.add(s.brand); renderBrandFilter(false); drawMarkers(); updateEdgeIndicators(); }
+  const mk = markerById[s.id];
+  const el = mk && mk.getElement();
+  const pt = map.latLngToContainerPoint([s.lat, s.lng]);
+  const onScreen = el && !el.classList.contains('chip-owned') && pt.x > 0 && pt.y > 0 &&
+    pt.x < map.getSize().x - chatRightInset() && pt.y < map.getSize().y - chatBottomInset();
+  if (!onScreen) { setActiveFromEdge(s); return; }
+  map.closePopup(); mk.openPopup();
+  if (IS_TOUCH) centerPopupOnMobile(mk); else keepCardVisible(mk);
+}
+// Desktop: a card opened by the chat (not by hover) can land under the toolbar or
+// the chat panel. Pan the map just enough to clear them — the card rides along
+// with its pin (autoPan is off for hover cards on purpose, so do it by hand here).
+function keepCardVisible(mk) {
+  requestAnimationFrame(() => {
+    const pop = mk.getPopup(), el = pop && pop.getElement();
+    const card = el && el.querySelector('.leaflet-popup-content-wrapper');
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    const maxR = window.innerWidth - chatRightInset() - 12, maxB = window.innerHeight - 12;
+    let dx = 0, dy = 0;
+    chipOccluders().forEach(o => {
+      if (r.right > o.left && r.left < o.right && r.bottom > o.top && r.top < o.bottom) {
+        const right = o.right + 12 - r.left, down = o.bottom + 12 - r.top;
+        if (r.right + right <= maxR && right <= down) dx = Math.max(dx, right); else dy = Math.max(dy, down);
+      }
+    });
+    if (r.right + dx > maxR) dx = maxR - r.right;      // clear the chat panel / right edge
+    if (r.top + dy < 12) dy = 12 - r.top;               // top edge
+    if (r.bottom + dy > maxB && r.top + dy > 12) dy = Math.max(12 - r.top, maxB - r.bottom);
+    if (dx || dy) map.panBy([-dx, -dy], { duration: .35 });   // content moves by +dx,+dy
+  });
+}
+// Run after the current map flight ends (or a fallback timeout if none is running).
+function afterFlight(cb) {
+  let done = false;
+  const go = () => { if (!done) { done = true; cb(); } };
+  map.once('moveend', go);
+  setTimeout(go, 1200);
+}
+
+function applyChatActions(actions) {
+  // Order matters: a new result set resets the brand filter, so show results
+  // first, then apply filters/grade, then focus a station.
+  const rank = { show_search_results: 0, set_brand_filter: 1, set_fuel_grade: 2, focus_station: 3 };
+  const list = [...(actions || [])].sort((a, b) => (rank[a.type] ?? 9) - (rank[b.type] ?? 9));
+  // Phones: the full chat sheet leaves too little map between it and the toolbar
+  // for a station card (~194px), so shrink it to a "peek" (latest reply + input)
+  // BEFORE framing — setActiveSet / popup centering measure the sheet's height.
+  if (list.length && IS_MOBILE_W()) setChatPeek(true);
+  let focusId = null, moved = false;
+  for (const a of list) {
+    if (a.type === 'show_search_results' && a.origin && Array.isArray(a.stations)) {
+      const o = a.origin;
+      const mi = Math.min(5, Math.max(0.5, +a.radius_miles || RADIUS_DEFAULT_MI));
+      radiusSlider.value = mi; syncRadiusUI(); radiusM = Math.round(mi * MI_TO_M);
+      const stations = a.stations.map(r => FuelServices.fromRaw(r, o.lat, o.lng)).sort((x, y) => x.distanceMi - y.distanceMi);
+      document.getElementById('searchInput').value = ''; syncSearchClear();
+      setActiveSet(stations, { lat: o.lat, lng: o.lng, label: o.label, fullLabel: o.label, isHome: false });
+      moved = true;
+      if (a.focus_station_id) focusId = a.focus_station_id;
+    } else if (a.type === 'set_brand_filter' && Array.isArray(a.brands)) {
+      state.brands = new Set(a.brands.filter(k => FILTER_KEYS.includes(k)));
+      renderBrandFilter(false); render();
+    } else if (a.type === 'set_fuel_grade') {
+      setGrade(a.grade);
+    } else if (a.type === 'focus_station') {
+      focusId = a.station_id;
+    }
+  }
+  // A grade/brand change re-renders the pins with a crossfade (old markers are
+  // cleared ~65ms later by drawMarkers), which would close a card opened right
+  // now — so open it after the redraw (or after the map flight, if one started).
+  if (focusId) { if (moved) afterFlight(() => openStationCard(focusId)); else setTimeout(() => openStationCard(focusId), 150); }
+}
+
+// retry=true re-sends a question whose bubble is already shown (after a passcode prompt)
+async function sendChat(text, retry = false) {
+  const q = (text || '').trim();
+  if (!q || chatBusy) return;
+  if (!retry) chatBubble('user', q);
+  if (!getChatPass()) { chatPending = q; chatEls.passForm.hidden = false; chatEls.pass.focus(); return; }
+  chatPending = null;
+  chatHistory.push({ role: 'user', content: q });
+  const thinking = chatBubble('thinking', 'Thinking…');
+  setChatBusy(true);
+  try {
+    const { status, data } = await FuelServices.chat({ passcode: getChatPass(), messages: chatHistory, map_context: mapContext() });
+    thinking.remove();
+    if (status === 401) {
+      chatHistory.pop(); setChatPass(''); chatPending = q;
+      chatBubble('note', 'That passcode didn’t work. Enter the chat passcode to continue.');
+      chatEls.passForm.hidden = false; chatEls.pass.value = ''; chatEls.pass.focus();
+      return;
+    }
+    if (status !== 200 || !data) {
+      chatHistory.pop();
+      chatBubble('note', 'The chat service didn’t answer' + (data && data.error ? ` (${data.error}${data.message ? ': ' + data.message : ''})` : ` (HTTP ${status})`) + '. Try again in a moment.');
+      return;
+    }
+    chatHistory.push({ role: 'assistant', content: data.reply || '' });
+    chatBubble('assistant', data.reply || '(no reply)');
+    applyChatActions(data.actions);
+  } catch (err) {
+    thinking.remove(); chatHistory.pop();
+    console.error('[chat]', err);
+    chatBubble('note', 'Can’t reach the chat service. Check your connection and try again.');
+  } finally {
+    setChatBusy(false);
+    // desktop: ready for the next question. Phones: leave focus off the input —
+    // refocusing would reopen the keyboard and un-peek the sheet over the map.
+    if (chatEls.passForm.hidden && !IS_MOBILE_W()) chatEls.input.focus();
+  }
+}
+
+chatEls.fab.addEventListener('click', () => setChatOpen(true));
+chatEls.close.addEventListener('click', () => setChatOpen(false));
+chatEls.form.addEventListener('submit', e => {
+  e.preventDefault();
+  const t = chatEls.input.value; chatEls.input.value = '';
+  if (IS_MOBILE_W()) chatEls.input.blur();   // drop the phone keyboard so the map shows
+  sendChat(t);
+});
+chatEls.passForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const v = chatEls.pass.value.trim(); if (!v) return;
+  setChatPass(v); chatEls.passForm.hidden = true; chatEls.pass.value = '';
+  if (chatPending) { const q = chatPending; chatPending = null; sendChat(q, true); }
+  else chatEls.input.focus();
+});
+chatEls.log.addEventListener('click', e => {
+  const b = e.target.closest('.chat-hint'); if (b) { sendChat(b.textContent); return; }
+  setChatPeek(false);   // tap the peeking reply → full chat again
+});
+chatEls.panel.querySelector('.chat-head').addEventListener('click', e => { if (!e.target.closest('.chat-close')) setChatPeek(false); });
+chatEls.input.addEventListener('focus', () => setChatPeek(false));
 
 /* ===================== boot ===================== */
 function render() { renderMarkers(); updateEdgeIndicators(); updateFreshness(); }

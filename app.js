@@ -1,15 +1,15 @@
 /* ============================================================
    Hope Ave Fuel — app logic
    ------------------------------------------------------------
-   Organized into sections; behavior is identical to the original
-   single-file build. Several behaviors here are deliberate and
+   Organized into sections. Several behaviors here are deliberate and
    fragile — see DECISIONS.md before changing:
-     • hover bridge (cancelPendingClose / scheduleClose, 220ms)
+     • hover bridge (HOVER_OPEN_MS 40 / HOVER_CLOSE_MS 80) + pointer-events rules
      • crossfade (renderMarkers -> drawMarkers)
-     • off-screen edge-indicator angle math
-     • locate button centers HOME with a toolbar pixel offset
+     • off-screen / behind-toolbar edge chips (transform-positioned, de-overlapped)
+     • mobile tap re-centering (centerPopupOnMobile: panTo vs flyTo)
      • tile-host fallback chain -> vector fallback
-   Reads the data layer from window.FuelData (see data.js).
+   Live data comes only through window.FuelServices (services.js); only the
+   NOW / HOME constants are read from window.FuelData (data.js).
    ============================================================ */
 (function () {
 'use strict';
@@ -261,19 +261,54 @@ const fallback = L.layerGroup([
 ]).addTo(map);
 
 /* ===================== tiles (with host fallback) =====================
-   1) CARTO Voyager  — closest free look to Google Maps (clean, light, friendly)
-   2) Esri World Street
+   1) CARTO Voyager  — closest free look to Google Maps (clean, light, friendly).
+                       Needs CARTO_KEY (below); skipped when it's empty.
+   2) Esri World Street — keyless; the default while there's no CARTO key
    3) OpenStreetMap  — busier; softened via CSS filter toward the Google palette
    4) vector net     — only if every host is blocked
    For a literal Google basemap in production, swap to the Google Maps JS API. */
+
+/* CARTO basemap key. Since Sept 2026, CARTO answers EVERY tile request that has no
+   valid key with the same "API KEY REQUIRED" watermark image (HTTP 200). Free for
+   personal / non-commercial use (5M tiles/month): request one at
+   https://carto.com/basemaps/apikey and paste it here. A tile key is public by
+   nature — the browser fetches tiles directly and CARTO's terms forbid proxying
+   them — so protect it with the restrictions in CARTO's dashboard, not by hiding it.
+   Empty → CARTO is skipped and the map starts on Esri. */
+const CARTO_KEY = 'cb1_5fl8_1_f1f134b92d308b9c71b7783a';
+
 const STYLES = [
-  { name: 'voyager', filter: false, url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', sub: 'abcd', max: 20, attr: '&copy; OpenStreetMap &copy; CARTO' },
+  { name: 'voyager', needsKey: true, filter: false, url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=' + encodeURIComponent(CARTO_KEY), sub: 'abcd', max: 18 /* keyed tiles stop at z18; z19+ → 403 (measured 2026-11-24) */, attr: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>' },
   { name: 'esri',    filter: false, url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', sub: 'abc', max: 19, attr: 'Tiles &copy; Esri' },
-  { name: 'osm',     filter: true,  url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', sub: 'abc', max: 19, attr: '&copy; OpenStreetMap contributors' },
-];
+  { name: 'osm',     filter: true,  url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', sub: 'abc', max: 19, attr: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' },
+].filter(s => !s.needsKey || CARTO_KEY);
+
+/* A host that is up but refusing us can answer every request with one placeholder
+   image and HTTP 200 (CARTO's "API KEY REQUIRED" watermark — also what a wrong or
+   revoked key gets). Leaflet counts that as a successful load, so the error-based
+   fallback in mountTiles() never fires and the watermark tiles across the map.
+   Guard: fetch two tiles that differ on ANY real map (the whole world at z0 vs one
+   quadrant at z1). Byte-identical → placeholder → skip the host. Inconclusive
+   (network/CORS failure) → mount anyway and let the tile-error path decide. */
+async function servesPlaceholder(s) {
+  const at = (z, x, y) => L.Util.template(s.url, { s: s.sub[0], z, x, y, r: '' });
+  try {
+    const [a, b] = await Promise.all([at(0, 0, 0), at(1, 0, 0)].map(u => fetch(u).then(r => (r.ok ? r.arrayBuffer() : null))));
+    if (!a || !b || a.byteLength !== b.byteLength) return false;
+    const x = new Uint8Array(a), y = new Uint8Array(b);
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+    return true;
+  } catch (e) { return false; }
+}
+
 let styleIdx = 0, tiles = null, tilesLive = false;
-function mountTiles() {
+async function mountTiles() {
   const s = STYLES[styleIdx];
+  if (await servesPlaceholder(s)) {
+    console.warn(`[tiles] ${s.name} is serving a placeholder image (missing/invalid key?) — skipping it`);
+    if (styleIdx < STYLES.length - 1) { styleIdx++; mountTiles(); } else showMapBadge();
+    return;
+  }
   document.getElementById('map').classList.toggle('gmaps-soften', !!s.filter);
   tiles = L.tileLayer(s.url, { subdomains: s.sub, maxZoom: s.max, attribution: s.attr }).addTo(map);
   let err = 0;

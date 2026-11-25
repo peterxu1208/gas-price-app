@@ -1,11 +1,10 @@
 /* ============================================================
-   DATA LAYER
+   CONSTANTS (+ legacy sample fixture)
    ------------------------------------------------------------
-   This is the swap seam for live data. To go live, replace the
-   body of getStationData() with `return fetch('/api/prices').then(r=>r.json())`
-   (and make callers await it) — keep the returned shape identical to
-   DATA-SHAPE.md. Everything else (rendering, sorting, freshness badges,
-   the "cheapest" crown, off-screen indicators) reads from that shape.
+   The app is live: station data now comes from Google via services.js
+   and the api/ proxy. Only NOW (page-load time, used for "Xh ago" ages)
+   and HOME (the Waltham fallback point) are used. getStationData() is the
+   original 7-station sample fixture — UNUSED, kept only as a reference.
 
    Exposed on window.FuelData so app.js can consume it without a build step
    (plain <script> tags, no ES modules, still opens via file://).

@@ -1,116 +1,84 @@
 # Hope Ave Fuel
 
-Personal gas-price tracker for Shell/Mobil stations near 60 Hope Ave,
-Waltham, MA. Built interactively in Claude.ai; this folder is a handoff to
-continue the work in Claude Code.
+Personal gas-price map: live prices for gas stations near you, your saved home, or
+any place you search. Prices and search come from Google; the map itself is
+Leaflet with CARTO Voyager street tiles (Esri as backup — see "Map tiles" below).
+
+**Live app:** https://gas-price-app-nu.vercel.app
 
 ## Start here
 
-1. **Read `DECISIONS.md` first.** It captures every explicit decision made
-   so far (scope, radius, brands, UI choices) and several non-obvious
-   implementation details that are easy to accidentally break. Skipping
-   this will cost you more time than reading it.
-2. **Read `DATA-SHAPE.md` second**, especially before touching anything
-   related to live data — it's the exact contract the frontend expects.
-3. **Run it over `http://`, not `file://`** — double-click
-   **`Start Hope Ave Fuel.bat`** (Windows; needs Python, which is already
-   installed here). It serves the folder at `http://localhost:8753` and opens
-   your browser. Keep that window open while using the app.
-   - You *can* still open `index.html` directly (`file://`) — the map and the 7
-     sample stations work fine — but **location search will not**: browsers block
-     `file://` pages from calling outside services (Nominatim/Overpass), so the
-     search returns "Can't reach the search service." Running over `http://`
-     fixes it. No build step either way.
+1. **Read `DECISIONS.md`** — how the app works, the decisions behind it, and the
+   fragile spots (hover timing, pointer-events, edge chips) that are easy to break.
+2. **Read `DATA-SHAPE.md`** before touching anything data-related — the exact shapes
+   passed between Google, the proxy, `services.js` and `app.js`.
 
 ## Files
 
-The app was split out of a single `index.html` into a few plain files for
-modularity. There's still **no build step and no server** — `index.html`
-loads `styles.css`, `data.js`, `services.js`, and `app.js` via relative paths
-and plain `<script>`/`<link>` tags (intentionally not ES modules, so `file://`
-still works). Just open `index.html`.
+No build step: `index.html` loads Leaflet (CDN), then `data.js`, `services.js`,
+`app.js` with plain `<script>` tags.
 
 | File | What it is |
 |---|---|
-| `index.html` | Markup + asset links. Loads Leaflet (CDN), then `data.js`, `services.js`, `app.js` (in that order). **Open this.** |
-| `styles.css` | All UI styling (was the inline `<style>` block). Font sizes use **design tokens** in `:root`, size-named after **Tailwind** (`--fs-lg`/`--fs-base`/`--fs-sm`/`--fs-xs` = 18/16/14/12), used across the toolbar, map pins, and popup; see DECISIONS.md → "Type scale". |
-| `data.js` | The sample-data **fixture** — `HOME` + `getStationData()`, exposed on `window.FuelData`. The current hand-written prices live here. |
-| `services.js` | **The single external-data boundary** (`window.FuelServices`): `geocode()`, `findStationsNear()`, `getCurrentPosition()` (device GPS), `reverseGeocode()`. Calls the Google proxy under `api/` (same-origin `fetch('/api/...')`). Domain helpers (brand classifier, distance) are injected by `app.js` so this layer stays UI-agnostic. |
-| `app.js` | All app logic — map, tiles+fallback, markers/popups, edge indicators, controls, search + home/locate UI. Reads external data **only** through `window.FuelServices`. Home is saved per-device in `localStorage`. Wrapped in an IIFE; boots asynchronously. |
-| `api/geocode.js`, `api/stations.js` | Vercel serverless functions — the proxy to Google (Geocoding incl. reverse `latlng`, + Places `fuelOptions`). Keep the API key server-side; read it from the `GOOGLE_SERVER_KEY` env var. |
-| `DECISIONS.md` | Project decisions, scope, and gotchas. Read first. |
-| `DATA-SHAPE.md` | The exact JS object shape the frontend expects from `getStationData()` / a future `fetch('/api/prices')`. |
+| `index.html` | Markup: map, search bar, toolbar card, home chip + gear, "near me" button, set-home modal |
+| `styles.css` | All styling. Font sizes are tokens in `:root` (`--fs-lg/base/sm/xs` = 18/16/14/12); mobile layout at ≤640 px |
+| `data.js` | `HOME` (Waltham fallback point) and `NOW` (page-load time). Also the old 7-station sample data, now unused |
+| `services.js` | The only file that makes network calls: `geocode`, `reverseGeocode`, `findStationsNear`, `getCurrentPosition` |
+| `app.js` | Everything else: map + tiles, pins, cards, edge chips, filters, radius, search, home, startup |
+| `api/stations.js` | Vercel function → Google Places API (New) nearby gas stations with `fuelOptions` prices |
+| `api/geocode.js` | Vercel function → Google Geocoding API (search and reverse) |
+| `_selfcheck.js` | Dev-only UI checker, not loaded by the app (see `DECISIONS.md`) |
+| `Start Hope Ave Fuel.bat` | Local static server on port 8753 — UI only, no live data |
+| `docs-archive/` | Previous versions of these notes (July 2026) |
 
-## Location search
+## Using it
 
-The toolbar card has a search bar: type any place ("Cambridge, MA", a street,
-a ZIP) and the map swaps to gas stations near there with live prices. The card's
-location name updates, and the ✕ in the search box returns to your home view.
+- **Search bar** — type a place and press Enter; the map moves there and shows
+  stations within the radius. ✕ clears the text only.
+- **Grade** — Reg / Mid / Prem (default Premium).
+- **Brands** — All, Shell, Exxon/Mobil, BP/Amoco, Chevron/Texaco, Phillips 66,
+  Other. Majors present in the area start checked; Other (independents) starts off.
+- **Radius** — 0.5–5 mi, default 2.5; re-fetches when you let go. Resets on reload.
+- **Home chip + gear** — the gear opens "Set home address"; once saved (on this
+  device only), the Home chip jumps back there.
+- **Bottom-right button** — stations near your current location.
+- **Pins** — hover (desktop) or tap (phone) for all grades, freshness, Open/Closed,
+  and NAVIGATE. The cheapest gets a ◆ CHEAPEST crown. Stations off-screen or
+  hidden under the toolbar show arrow chips at the edge.
 
-Geocoding + nearby stations come from **Google** via the `api/` proxy, called
-through `services.js` (`geocode()` / `findStationsNear()`), never from `app.js`
-directly. See "Live data (Google)" below and `DECISIONS.md` for the full rationale.
+On first open with no saved home, the app asks for your location; if you decline,
+it opens on 60 Hope Ave, Waltham.
 
-## Home & current location
+## Running and deploying
 
-Three controls work together (all wired in `app.js`, with the device/Google calls
-behind `services.js`):
+- **Deployed (normal use):** Vercel project serving this folder, with the Google
+  key in the `GOOGLE_SERVER_KEY` environment variable. After changing an env var,
+  redeploy for it to take effect.
+- **Local, UI only:** double-click `Start Hope Ave Fuel.bat`. The map loads, but
+  there's no `/api`, so it shows "Couldn't load live prices".
+- **Local with live data:** `vercel dev` with `GOOGLE_SERVER_KEY` set (needs Node and
+  the Vercel CLI — not installed on this machine yet).
 
-- **Home chip** (top of the card) — jumps to your saved home. It's **disabled
-  until you set a home** ("No home set"); once set it shows the place name and is
-  clickable.
-- **✎ (edit) button** — type a home address; it's geocoded and **saved on your
-  device** (`localStorage`), so it persists across reloads.
-- **Bottom-right arrow → "Stations near me"** — uses the browser's free
-  `navigator.geolocation` (device GPS) to show live stations near where you are.
+## Map tiles (CARTO key)
 
-**Per-device by design.** Home is stored in `localStorage`, which is scoped to
-each browser+device — so different people on different devices each get their own
-home automatically, with no accounts or backend. (Caveat: it's per-browser, not
-synced across a single person's own devices; true cross-device sync would need
-sign-in + a database — out of scope.)
+Since September 2026 CARTO requires a key; without a valid one every tile shows an
+"API KEY REQUIRED" watermark. The app's key is in `const CARTO_KEY` in `app.js`
+(added 2026-11-24; free personal tier, 5M tiles/month, managed at
+dashboard.basemaps.carto.com). If the key stops working, the app detects the
+watermark and switches to Esri tiles automatically. To replace the key, request a new
+one at https://carto.com/basemaps/apikey, paste it into `CARTO_KEY`, and redeploy.
+The key is visible in the browser by design, so keep it restricted to the site's
+domain in CARTO's dashboard.
 
-**First-open default:** with no saved home yet, the app asks for your location and
-opens to **stations near you**; if you deny or it's unavailable, it falls back to a
-default seed view (Waltham). Returning users with a saved home open straight to it.
-Geolocation needs **HTTPS** (Vercel qualifies) and a one-time permission grant.
+## Google setup (what the key needs)
 
-### Brands & filtering
+In Google Cloud Console, for the project that owns the key:
+- **Places API (New)** and **Geocoding API** enabled.
+- An active billing account (free usage caps apply; set a budget alert).
+- The key is used **server-side** only, so restrict it by *API* (those two), not by
+  website/HTTP referrer — a referrer restriction blocks server calls.
 
-Raw map data lists *every* fuel station, including unbranded/independent pumps —
-too noisy. So `app.js` holds a curated **brand registry** (`BRANDS`): the set of
-"major" brands we care about. Each entry has a display label, an accent color
-(used for the pin/chip/dot theming via an inline `--brand` CSS variable), the
-messy real-world name aliases that map to it, and optionally a real logo.
-
-- **Current majors:** Shell · Exxon/Mobil · BP/Amoco · Chevron/Texaco · Phillips 66.
-  (Aliases fold variants together, e.g. Exxon + Mobil + Esso → one entry; matched
-  on word boundaries so short tags like `bp` don't match inside other words.)
-- **Why a registry:** one edit-in-one-place source of truth. Add or remove a brand
-  by editing `BRANDS` — the filter checkboxes, counts, and colors are all derived
-  from it. `classifyBrand()` maps each search result to a registry brand or `other`.
-- **The filter** is a multi-select checkbox group with an **All** master toggle,
-  every registry brand, and an **Other** bucket. The registry groups are **always
-  shown in every location** (a brand with nothing in radius just shows count `0`),
-  so the options stay consistent rather than appearing/disappearing per search.
-  Majors are checked by default; **Other (independents) is unchecked by default**,
-  which is what keeps searches from showing junk — tick it to reveal them.
-
-Full reasoning and the non-obvious bits live in `DECISIONS.md`; the `brand` field
-contract is in `DATA-SHAPE.md`.
-
-## Live data (Google)
-
-Live prices + search now come from **Google** through the serverless proxy in
-`api/` (Geocoding + Places `fuelOptions`), called via the `services.js` boundary.
-Deploy to a host with serverless functions (e.g. Vercel), set the
-`GOOGLE_SERVER_KEY` env var, and the home map + search show real prices. Run
-locally without the proxy (`file://` or a plain static server) and the app shows
-an explicit "couldn't load live prices" state — it never falls back to fake
-sample numbers. (The sample data in `data.js` remains only as a fixture/reference.)
-
-The one piece still **not** from Google is the *basemap*: it's Leaflet with light
-CARTO tiles (reads close to Google), which is intentional and sufficient for
-current needs. A pixel-true Google basemap is optional and not required — see
-`DECISIONS.md` ("What's NOT done yet") if you ever want it; it would be a fresh
-build from the current `index.html`, not a resurrection of any old file.
+Quick health check: open
+`https://gas-price-app-nu.vercel.app/api/geocode?q=Waltham` — a JSON place means
+Google is connected; an `error` like `geocode REQUEST_DENIED` includes Google's
+reason.

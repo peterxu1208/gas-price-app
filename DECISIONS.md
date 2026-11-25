@@ -1,305 +1,294 @@
-# Hope Ave Fuel — Project Handoff
+# Hope Ave Fuel — Decisions & How It Works
 
-A personal web app that shows real-time gas prices for major-brand stations near
-60 Hope Ave, Waltham, MA, on an interactive map. Built iteratively in Claude.ai;
-handing off to Claude Code to continue.
+A personal web app that shows live gas prices for stations near you (or any place
+you search) on an interactive map. Started as a hand-written prototype for 60 Hope
+Ave, Waltham, MA; now runs on live Google data for any location.
+
+> Last synced to the code: **2026-11-24**. The previous version of this file (as of
+> July 2026, describing the OpenStreetMap / sample-data era) is kept in
+> `docs-archive/DECISIONS-2026-07.md` for history.
 
 ## What this is, in one paragraph
 
-A single-page app with a Leaflet map background, custom price-tag pins for 7
-real gas stations (Shell + Mobil) within ~2.5 miles of home, a compact toolbar
-(fuel grade + brand filters), hover/tap cards with full price breakdowns, and
-off-screen direction indicators. Right now **all prices are hand-written sample
-data** — nothing is live yet. That's the next milestone.
+A single-page app: a Leaflet map (CARTO Voyager street tiles, Esri as backup) with
+price-tag pins for
+gas stations within a chosen radius (0.5–5 mi, default 2.5) of the current
+*origin* — your saved home, your device location, or a searched place. Prices,
+open/closed state and place search come **live from Google** through a small
+serverless proxy on Vercel. A floating toolbar holds the search bar, grade picker,
+brand filter, and radius slider; hovering (desktop) or tapping (touch) a pin opens
+a card with all grades, freshness, and a Navigate link. Stations that are
+off-screen or hidden behind the toolbar get arrow chips at the screen edge.
 
-## Current file
+**Live deployment:** `https://gas-price-app-nu.vercel.app` (verified working
+2026-11-24 — the proxy returned same-day Google prices).
 
-`index.html` — the working prototype. Originally a single self-contained file
-(HTML + CSS + JS inline, copied directly from the Claude.ai conversation); since
-split for modularity into `index.html` + `styles.css` + `data.js` + `services.js`
-+ `app.js`. Still **no build step and no server** — plain `<script>`/`<link>`
-tags and relative paths (not ES modules), so it opens directly in any browser.
-See `README.md` for the per-file breakdown.
+## Architecture
 
-### The `services.js` boundary (external-data adapter)
+No build step, no ES modules, no framework. `index.html` loads, in order:
+Leaflet (CDN) → `data.js` → `services.js` → `app.js`.
 
-All calls to the outside world go through **`services.js`** (`window.FuelServices`):
-`getHomeStations()`, `geocode()`, `findStationsNear()`. This is deliberately the
-*single* file that knows which backend is live. Today they wrap the sample-data
-fixture (`data.js`) and the keyless OpenStreetMap services; each has a
-`TODO(google)` marking exactly what to replace to go live with Google — without
-touching `app.js` or the UI. `app.js` reads external data only through this
-interface and **injects** its domain helpers (the `classifyBrand` registry
-matcher and `distMi`) via `FuelServices.configure()`, so the brand registry and
-its colors stay in the UI layer. The data interface is **async** end-to-end
-(`app.js` `boot()` awaits `getHomeStations()`), so the eventual Google swap is a
-function-body change, not a control-flow change. The one external dependency
-*not* behind this boundary is the Leaflet basemap, which is woven through
-`app.js` (see the Google Maps JS note under "What's NOT done yet").
+| Layer | File | Responsibility |
+|---|---|---|
+| Markup | `index.html` | Map container, search bar, toolbar card, home chip + gear button, "near me" button, set-home modal |
+| Styling | `styles.css` | All styles; font-size tokens in `:root`; one mobile breakpoint at `max-width:640px` |
+| Constants | `data.js` | `window.FuelData` = `{ NOW, HOME, getStationData }`. Only `NOW` (page-load timestamp) and `HOME` (Waltham seed point) are used. `getStationData()` is the old sample fixture — **unused**, kept as reference |
+| Data boundary | `services.js` | `window.FuelServices` — the **only** file that makes network calls. Converts proxy results into the app's station shape |
+| App logic | `app.js` | Map, tiles, pins, popups, edge chips, filters, radius, search, home, boot. Reads data only via `FuelServices` |
+| Proxy | `api/stations.js`, `api/geocode.js` | Vercel serverless functions that call Google with the server-side key |
+| Dev tool | `_selfcheck.js` | UI invariant checker; not loaded by the app (see below) |
 
-## Decisions already made (don't re-litigate these without reason)
+### The `services.js` boundary
 
-- **Radius: ~2.5 miles** from 60 Hope Ave, Waltham, MA 02453. Chosen after
-  mapping the area — this radius captures a balanced 3 Mobil / 4 Shell mix.
-  Tighter radii (1–1.5 mi) were rejected for being too Mobil-heavy.
-- **Brands: Shell and Mobil only.** "Exxon" was explicitly considered and
-  dropped — the nearby Mobil stations *are* the Exxon-Mobil brand, there's no
-  separately-branded Exxon nearby. Independents and other brands (Speedway,
-  Haffner's, etc.) were deliberately excluded — major-brand-only was the call.
-- **The 7 stations** (real coordinates, real Google Maps links):
-  1. Mobil — Moody St (0.45 mi)
-  2. Mobil — 821 Main St (0.70 mi)
-  3. Shell — 962 Main St (0.75 mi)
-  4. Mobil — 1335 Main St (1.35 mi)
-  5. Shell — 65 Main St (1.85 mi)
-  6. Shell — Waverley Oaks Rd (2.20 mi)
-  7. Shell — Totten Pond Rd (2.30 mi) — sample data has this one with *no*
-     price entries on purpose, to exercise the "no data" UI state honestly.
-- **Default fuel grade: Premium.** Diesel was removed from the UI entirely
-  (button removed, dropped from the active grade list) per explicit request —
-  raw diesel sample prices are still sitting in the data objects, harmless,
-  easy to resurrect if ever wanted back.
-- **Map engine: Leaflet**, not the Google Maps JS API — by choice, specifically
-  *so the basemap renders inside the Claude.ai artifact preview sandbox*,
-  which blocks some external tile hosts. (An early parallel Google Maps JS API
-  build existed but has since been deleted — it diverged too far to be worth
-  reconciling. If a pixel-true Google basemap is ever wanted, rebuild it from the
-  current `index.html` rather than resurrecting that old file. See "What's NOT
-  done yet".)
-- **Fonts: Poppins**, replacing an earlier Bricolage Grotesque + Martian Mono
-  pairing, per explicit request.
-- **Light mode only** — dark mode was built first, then explicitly replaced.
-- **No bottom sheet.** A draggable bottom sheet existed and was explicitly
-  removed; all per-station detail (full grade breakdown, freshness, open/closed,
-  Navigate link) now lives in the hover/tap card on each map pin instead.
-- **Hover-to-open on desktop, tap-to-open on touch** — detected at runtime via
-  `matchMedia('(hover: none), (pointer: coarse)')`. This split exists because
-  hover has no equivalent on touch devices; built deliberately, not a bug.
-- **No brand icons in the toolbar filter buttons** (removed per request — text
-  only: "All 7 / Shell 4 / Mobil 3"). Brand logos (via Simple Icons CDN, with a
-  generic pump-icon fallback if that CDN is blocked) **are still used inside
-  the hover/tap popup** on each pin, to help identify the exact station.
+All outside calls go through `window.FuelServices`:
 
-## Location search (added after the original handoff)
+- `geocode(q)` → `GET /api/geocode?q=` → `{lat, lng, label, full}` or `null`
+- `reverseGeocode(lat, lng)` → `GET /api/geocode?latlng=` → same shape or `null`; never throws
+- `findStationsNear(lat, lng, radiusM)` → `GET /api/stations?lat=&lng=&radius=` → station array sorted by distance
+- `getCurrentPosition()` → browser geolocation (free, no key) → `{lat, lng}`; rejects with the browser error (`code 1` = permission denied)
+- `getHomeStations()` → stations around the Waltham seed. **Not called anywhere** (leftover)
+- `configure({classify, distMi})` → `app.js` injects the brand classifier and distance function so the brand registry and its colors stay in the UI layer
 
-- **Goal:** type any location → see gas stations near it; the card's location
-  name and the map both update; the home/locate button returns to the original 7.
-- **Keyless OpenStreetMap, by choice.** Geocoding uses Nominatim
-  (`nominatim.openstreetmap.org`), nearby stations use Overpass
-  (`overpass-api.de`, `amenity=fuel` within ~4 km). Both are keyless and send
-  `Access-Control-Allow-Origin: *`, so they work straight from `file://` with no
-  proxy and no build step. This was the deliberate call over Google Places: the
-  handoff already forbids exposing a Google key in the browser, and Google needs
-  a serverless proxy that isn't built yet. **Both calls live in `services.js`**
-  (`geocode()` / `findStationsNear()`), not `app.js` — see the `services.js`
-  boundary note above.
-- **Searched stations have no prices.** OSM knows *where* stations are, not their
-  fuel prices, so searched stations carry `fuelPrices: []` and render in the
-  existing "no data" (`N/A`) state — the same path `shell-totten` exercises. This
-  is honest, not a bug. The objects returned by the search are shaped *exactly*
-  like `getStationData()` output, so when the Google `fuelOptions` proxy is added
-  it can populate `fuelPrices` and prices appear with zero UI changes.
-- **Brand registry + multi-select filter.** A curated `BRANDS` registry (in
-  `app.js`) defines the "major" brands — currently **Shell, Exxon/Mobil,
-  BP/Amoco, Chevron/Texaco, Phillips 66** — each with a label, accent color, and
-  OSM tag aliases (matched with word boundaries so e.g. "bp" doesn't hit mid-word).
-  `classifyBrand()` maps each search result to a registry brand or `other`.
-  To change which brands are "major", just edit `BRANDS` — the filter UI and
-  pin/chip colors are derived from it.
-  - The toolbar brand control is a **multi-select checkbox group** (`#brandFilter`).
-    **Every registry brand plus `Other` is always shown** (the fixed `FILTER_KEYS`
-    set, registry order, `Other` last), in *every* location — the registry is the
-    source of truth, so the options must be consistent. A brand with no stations in
-    the current radius just shows count **`0`** (it's not hidden). This was a
-    deliberate correction of an earlier version that built the list only from
-    brands present in the result set, which made the control's options jump around
-    per location. Replaced the old single-select Shell/Mobil segmented buttons.
-    Note: the search already fetches *all* `amenity=fuel` in radius and classifies
-    each, so every brand is genuinely considered — only the UI needed fixing.
-  - A leading **"All" master toggle** selects/clears every group at once (all
-    majors + `Other`). It renders checked when all are on, indeterminate when only
-    some are, unchecked when none — kept in sync as individual brands toggle
-    (`syncAll()`). Because `Other` is off by default, "All" sits at *indeterminate*
-    in the default state, which is the honest reading (not everything is selected).
-  - **`Other` (independents/unbranded) is off by default** — this is the fix for
-    "search shows too many junk stations". Majors start checked; the user can tick
-    `Other` to reveal the rest. If an area has *only* independents, `Other` is
-    auto-selected so the map isn't blank.
-  - `state.brand` (string) became `state.brands` (a `Set`); `visible()` filters by
-    membership. Brand accent color is applied via an inline `--brand` CSS var on
-    each pin/edge-chip, with CSS falling back to neutral for `other`.
-- **Origin marker is now dynamic.** The single home-pin became `renderOrigin()`:
-  a house icon at home, or a blue teardrop at a searched / current-location place.
-  `DATA` is the *active* set on screen (home, search, or "near me"), populated
-  asynchronously at `boot()` from `services.js` — there is no longer a fixed
-  `HOME_STATIONS` array; `homeOrigin()` derives the home point from the saved
-  `localStorage` home (or the Waltham seed). The `PAD` constant centralizes the
-  toolbar padding used for framing/edge-chips, bumped up because the card is taller.
-- **Politeness / limits.** Search fires on submit only (not per keystroke). If a
-  host is ever slow/blocked, the search surfaces a transient error toast and keeps
-  the current set.
+`toStation()` in `services.js` builds each station: brand from `classify({name})`
+(Google's display name only), distance from the **current origin** (not from home),
+a Google Maps link using the Place ID, and `fuelPrices` passed through unchanged.
 
-## Home location & current-location detection (added later)
+### The proxy (`api/`)
 
-- **Home is settable and saved per-device, not hardcoded.** Waltham is no longer
-  special — it's just a default *seed*. The user's home lives in `localStorage`
-  (`fuelHome` = `{lat,lng,label,full}`), set by typing an address into the **✎
-  editor** (geocoded via the Google proxy). The top **home chip** is **disabled
-  until a home is set**, then shows the place name and jumps there on click.
-- **Per-device by design — no accounts, no backend.** `localStorage` is scoped to
-  each browser+device, so different people on different devices automatically get
-  independent homes for free. Deliberate tradeoff: it's **per-browser**, not synced
-  across a single user's devices, and is lost if they clear site data. True
-  cross-device, per-account sync would require sign-in + a database — intentionally
-  out of scope for a personal app.
-- **"Stations near me"** (the bottom-right button, repurposed from the old
-  "back to home"): browser-native `navigator.geolocation` (free, no key) →
-  `findStationsNear()`. Needs **HTTPS** (Vercel) + a one-time permission grant;
-  desktop accuracy is Wi-Fi/IP-based (rougher), mobile is GPS-accurate. Denied/
-  unsupported → honest toast, current view kept.
-- **First-open default = current location.** With no saved home, `boot()` requests
-  the device location and opens to **stations near you**; if denied/unavailable it
-  falls back to the Waltham seed. Returning users with a saved home open straight
-  to it (no prompt). This was an explicit choice for the multi-user case — defaulting
-  everyone to Waltham would be meaningless for non-local users.
-- **All external calls still go through `services.js`.** Added `getCurrentPosition()`
-  (device) and `reverseGeocode()` (for a friendly "near me" / set-home label, via the
-  proxy's new `latlng` param). The brand registry/colors stay injected from `app.js`.
-- **Cost note:** geolocation is free; only the reverse-geocode label touches Google
-  (negligible, and the `/api/stations` cache is the real cost lever). See "What's NOT
-  done yet" / the cost guardrails below.
+- **Key:** read from the `GOOGLE_SERVER_KEY` environment variable on Vercel. Never
+  sent to the browser.
+- **`/api/stations`** calls Places API (New) `places:searchNearby` with
+  `includedTypes: ['gas_station']`, `maxResultCount: 20`, a circle of the requested
+  radius (capped at 50 km), and the field mask
+  `places.id,displayName,location,fuelOptions,currentOpeningHours`. Prices are
+  converted from Google's `{units, nanos}` to a number. Response cached at the edge:
+  `s-maxage=86400, stale-while-revalidate=86400`.
+- **`/api/geocode`** calls the Geocoding API with `address=` (search) or `latlng=`
+  (reverse). `ZERO_RESULTS` → `null` (200). Any other non-OK status (e.g.
+  `REQUEST_DENIED`) → 502 with Google's status and `error_message`, so key/billing
+  problems are visible rather than looking like "no results". Cached a day
+  (+7 days stale-OK). Builds a short "Street, City" label from address components.
+- **Cost:** `fuelOptions` is in Google's most expensive Places pricing tier. The edge cache is
+  the main cost control — don't remove it. Google refreshes fuel prices roughly
+  daily, so polling more often gains nothing.
 
-## Known non-obvious implementation details (read before touching these)
+## Decisions (don't re-litigate without reason)
 
-- **Hover-card interaction (dwell-to-open + grace-to-close bridge).** This was
-  rebuilt several times; the current design is deliberate — read before touching.
-  Hover open/close is bound to the visible `.ptag` chip (via `mouseenter`/
-  `mouseleave`), NOT Leaflet's bubbling `mouseover`/`mouseout`.
-  - **Open after a ~130ms dwell** (`HOVER_OPEN_MS`) so quick fly-bys over
-    neighbouring pins don't strobe popups open/closed.
-  - **Close after a ~260ms grace** (`HOVER_CLOSE_MS`); entering the popup CARD
-    cancels it, so the cursor can travel from the pin onto the card to read it /
-    click NAVIGATE. Closes only when the cursor leaves both.
-  - **Pointer-events are load-bearing:** the popup CARD (`.leaflet-popup-content-wrapper`)
-    is `pointer-events:auto` (so the bridge + NAVIGATE work), but the popup TIP and
-    outer box are forced `pointer-events:none!important` — the tip overlaps the chip
-    and, if interactive, steals the hover and reintroduces flicker. The marker icon
-    box is also `none` (only the chip is interactive) so adjacent pins' invisible hit
-    boxes don't overlap. `autoPan:false` on the popup so opening never moves the map.
-  - A `[BUG]` logging pass proved the earlier "map jumping" was actually this popup
-    strobing (the map never moved). Don't reintroduce instant-close-on-leave.
-- **Off-screen direction indicators.** Any visible station whose pin falls
-  outside the safe viewport (excluding the toolbar's footprint) gets a small
-  arrow chip clamped to the nearest edge, pointing toward it, clickable to fly
-  there. Recomputed on every map move/zoom *and* on filter change. The angle
-  math (`Math.atan2`, then `+90°` to orient the arrow glyph) was reasoned
-  through carefully but **never visually confirmed** by the human — if a
-  fresh session touches this, sanity-check the rotation direction against a
-  known station before assuming it's correct.
-- **Locate/recenter button.** Bottom-right, fixed icon (currently a filled
-  navigation-arrow glyph approximating iOS Google Maps' style — this was done
-  from memory, not a live reference, and may need correcting against the real
-  app). Clicking it computes the zoom level that fits all 7 stations (same
-  method `fitBounds` uses internally) but **centers on the home pin specifically**,
-  not the bounds' midpoint, with a manual pixel-offset correction for the
-  toolbar's footprint. This was an explicit, deliberate tradeoff: centering
-  home can mean stations aren't evenly margined anymore.
-- **Crossfade animation on filter change.** Switching grade/brand fades the
-  old pins out (~160ms) then fades the new set in (~220ms) — see `drawMarkers()`
-  vs `renderMarkers()`; the latter is the crossfade wrapper, the former does
-  the actual draw. Initial page load skips the fade (no pins exist yet to fade
-  out from).
-- **Type scale (design tokens).** Font sizes are CSS custom properties defined once
-  in `:root` and referenced everywhere, replacing the old scattered hardcoded values
-  (8–17px) that had an inverted hierarchy on mobile. Tokens are **size-named after
-  Tailwind CSS** (not role-named, so they read naturally in every context):
-  `--fs-lg` (18), `--fs-base` (16), `--fs-sm` (14), `--fs-xs` (12) — 1:1 with
-  Tailwind `lg`/`base`/`sm`/`xs`, also aligning with **Material Design 3**
-  Body/Label/Title. Each step is 2px apart so tiers stay distinct; `--fs-base` at 16
-  also prevents iOS Safari's input focus-zoom. Applied **uniformly across breakpoints**
-  (the scale converged for mobile readability and desktop compactness) — to diverge
-  one, override the token in the `@media (max-width:640px)` block, not per-element.
-  Two contexts are treated differently on purpose:
-  - **Toolbar + popup = reading UI** → full ladder, nothing below the 12px floor.
-    Toolbar: location name `lg`; search/set-home fields `base`; grade buttons + brand
-    chips + home chip `sm`; freshness + counts `xs`. Popup: station name `lg`; prices
-    `base`; Navigate `sm`; meta + badges + grade mini-labels `xs`.
-  - **Map pins = cartographic labels** → kept compact (an on-map convention; see the
-    Esri/Axis Maps guidance that on-screen labels bottom out ~9–10pt and the primary
-    label is bold/largest). Pin price `sm` (bold), cheapest-pin price `base`; the
-    brand name, `◆ CHEAPEST` crown, and edge-chip use `xs`/`sm` and lean on
-    **uppercase + letter-spacing** for legibility rather than a larger size. This is
-    why pins aren't inflated to the toolbar's sizes.
-  Poppins remains the family (see Fonts decision above).
-- **The vector "fallback" road drawing.** There's a hand-traced GeoJSON of
-  local roads (Main St, Moody St, Waverley Oaks, Totten Pond Rd, I-95, Charles
-  River) that only renders if *every* real tile host fails to load. It exists
-  purely as a safety net for the in-preview sandbox blocking tile CDNs — it is
-  not meant to be the primary basemap and shouldn't be polished further.
+- **Map engine: Leaflet with raster street tiles, not the Google Maps JS API.** The
+  basemap has never been Google. Originally chosen so the map rendered inside the
+  Claude.ai preview sandbox; CARTO Voyager was the preferred look because it reads
+  close to Google. Google is used for **data only**. A pixel-true Google basemap is
+  optional — see "Not done yet".
+- **CARTO now needs a key (since Sept 2026).** Without a valid key, CARTO answers
+  every tile request — HTTP 200 — with the same "API KEY REQUIRED" watermark image;
+  a wrong key gets the same image. Keys are free for personal / non-commercial use
+  (5M tiles/month) from https://carto.com/basemaps/apikey. Paste it into
+  `CARTO_KEY` near the top of the tiles section in `app.js`. The key is necessarily
+  visible in the browser (CARTO's terms forbid proxying tiles), so lock it down with
+  the restrictions in CARTO's dashboard. Attribution "© OpenStreetMap contributors,
+  © CARTO" is required and already set. **A key was added on 2026-11-24** (Voyager
+  verified loading on localhost). If `CARTO_KEY` is ever emptied, CARTO is skipped
+  and the map uses Esri. Keyed Voyager tiles stop at **zoom 18** (z19+ returns 403),
+  so the CARTO style's `max` is 18 — raising it blanks the map when zoomed in fully.
+- **Tile fallback chain:** CARTO Voyager (only if `CARTO_KEY` is set) → Esri World
+  Street → OpenStreetMap (softened with a CSS filter) → a hand-traced vector drawing
+  of Waltham roads. Two guards decide when to move down the chain:
+  1. **Placeholder check (`servesPlaceholder`)** — before using a host, fetch two
+     tiles that differ on any real map (z0 world vs one z1 quadrant). Identical
+     bytes → the host is serving a placeholder (missing/invalid key) → skip it and
+     log a `[tiles]` warning. Added 2026-11-24 after the CARTO change slipped past
+     guard 2 and tiled the watermark across the map. If the check can't run
+     (network error), the host is used and guard 2 decides.
+  2. **Tile errors** — a host is abandoned after 3 tile errors before any tile loads.
+  If no tiles load within 4.2 s, a badge explains the fallback. The vector drawing is
+  a safety net only — don't polish it.
+- **Live data only, never fake prices.** If the proxy fails at startup the map is
+  left empty with a "Couldn't load live prices" toast. The sample fixture is never
+  shown as if it were live.
+- **Default grade: Premium.** Grade buttons: Reg / Mid / Prem. Diesel was removed
+  from the UI by request (`GORD` excludes it), but Google's `DIESEL` entries stay in
+  the data, harmlessly.
+- **Radius slider:** 0.5–5 mi in 0.1 steps, default 2.5 mi (a green tick marks the
+  default and the value turns green at it). Re-fetches once on release, not while
+  dragging. **Not persisted** — every page load starts at 2.5 mi.
+- **Brand registry** (`BRANDS` in `app.js`) — the curated "major" brands: **Shell,
+  Exxon/Mobil (mobil/exxon/esso), BP/Amoco (bp/amoco/arco), Chevron/Texaco
+  (chevron/texaco/caltex), Phillips 66**. Each has a label, accent color, aliases
+  (matched on word boundaries so "bp" can't match mid-word), and a logo (Shell from
+  the Simple Icons CDN with a pump-icon fallback; the rest are inline SVGs).
+  Everything else (Sunoco, Citgo, Gulf, independents…) is `other`. Edit `BRANDS` to
+  change the set — filter options, counts and colors all derive from it.
+- **Brand filter:** checkbox chips — an **All** master toggle, then every registry
+  brand, then **Other**, always shown in every location (a brand with nothing nearby
+  shows `(0)`). Defaults after each new result set:
+  - majors **with stations here** are checked; majors with 0 are unchecked;
+  - **Other is unchecked** (hides independents) — unless the area has *only*
+    independents, then Other is checked so the map isn't blank;
+  - All shows checked / indeterminate / unchecked to match.
+  Hovering the Other chip shows a tooltip listing the independent station names.
+- **Home is per-device.** Saved in `localStorage` key `fuelHome` =
+  `{lat, lng, label, full}`. No accounts, no backend, not synced across devices,
+  lost if site data is cleared — deliberate for a personal app.
+- **Startup location:** saved home if one exists → otherwise ask for device location
+  (opens to "stations near you") → if denied/unavailable, the Waltham seed
+  (60 Hope Ave, shown with the house pin and the label "Hope Ave").
+- **Fonts: Poppins. Light mode only** (dark mode was built, then replaced).
+- **No bottom sheet** — all station detail lives in the pin card.
+- **Hover to open on desktop, tap to open on touch**, detected with
+  `matchMedia('(hover: none), (pointer: coarse)')` or `navigator.maxTouchPoints`.
+- **No zoom (+/−) buttons.** Leaflet's default zoom control sat behind the toolbar and
+  poked out as a stray "beak". Zoom is by scroll / pinch / double-click.
+- **Filter chips use colored dots, not logos.** Logos appear only in the pin card.
 
-## What's NOT done yet (the real next milestones)
+## How the UI behaves
 
-1. **Live data.** The sample prices (`data.js` `getStationData()`) are shaped to
-   exactly match Google Places API (New)'s `fuelOptions` response format
-   (`{type, price, updateTime}` per grade, per station) — this was intentional,
-   so swapping in real data is contained to **`services.js`**: replace the bodies
-   of `getHomeStations()` / `findStationsNear()` (and `geocode()`) — each marked
-   `TODO(google)` — to call your proxy, keeping the return shapes. `app.js` and
-   the UI don't change; the interface is already async.
-   To actually wire this up:
-   - Get a Google Maps Platform API key with **Places API (New)** enabled
-     (field mask: `fuelOptions`).
-   - **Do not call Google's API directly from the browser** — the key would
-     be exposed. Build a small serverless proxy (Vercel function or
-     Cloudflare Worker) that holds the key server-side, calls Place Details
-     for the 7 station Place IDs, and returns JSON in the same shape.
-   - Real fuel-price refresh cadence: Google updates this data roughly daily
-     itself, not continuously — polling more than a few times a day won't
-     produce fresher numbers, just wasted quota. A few times a day, plus
-     on-app-open, is the sane default. This was already discussed and agreed
-     upon earlier in the build — don't over-engineer real-time polling.
-   - Need each station's real Google Place ID (not currently in the file —
-     only lat/lng and a `maps.google.com/?cid=` link are stored).
-2. **Google Maps JS API basemap (optional, not currently needed).** An early
-   parallel build (`Gas Price-google.html`) ported the UI onto the real Google
-   Maps JavaScript API for a pixel-true Google basemap, but it was shelved (it
-   won't render without a key) and has since been **deleted** — it had diverged
-   too far from `index.html` (brand filter, freshness stamp, `N/A` state, pin
-   labels, hover fixes, the `services.js` data layer) to be worth reconciling.
-   **For current progress and needs this is not required:** the live Google
-   *data* (prices + search) now flows through the `services.js` proxy while the
-   Leaflet basemap stays, and Leaflet with the light CARTO tiles reads very close
-   to Google. If a pixel-true Google basemap is ever wanted, treat it as a fresh
-   build *from the current `index.html`* (porting markers/popups/edge-indicators
-   to Advanced Markers + InfoWindow/OverlayView, and re-solving the hover
-   behavior on Google's terms) — not a resurrection of the old file.
-3. **Real Map ID / cloud styling**, if going the Google Maps route — currently
-   uses a placeholder `DEMO_MAP_ID`, fine for testing Advanced Markers, but
-   you'll want your own Map ID for custom styling.
-4. **Cost/quota guardrails** — set a budget alert in Google Cloud Console
-   before going live with a real key, even though expected usage (7 stations,
-   a few refreshes/day, personal use) is comfortably within free tiers for
-   both Maps JS API (10k loads/mo free) and Places API.
+### Toolbar (top-left on desktop, full-width on mobile)
+- **Search bar** (above the card): type a place, press Enter → geocode → stations
+  around it at the current radius. Fires on submit only, never per keystroke. On
+  success the text box is emptied. The **✕ only clears the text** — it does not
+  move the map or return home.
+- **Location name** (the current origin's short label; full address on hover) and a
+  **freshness stamp**: "Updated Xh ago" for the newest price among visible stations,
+  with a colored live dot; "no price data" (grey) if none.
+- **Grade** (Reg/Mid/Prem), **brand filter**, **radius slider**.
+- On mobile the card becomes a single column; the brand chips become one
+  horizontally swipeable row.
 
-## Files in this handoff
+### Home group (beside the toolbar on desktop, below it on mobile)
+- **Home chip** — disabled and reads "No home set" until a home is saved; then reads
+  "Home" (full address as tooltip) and flies to home on click.
+- **Gear button** — opens the **Set home address** modal: text field with ✕, Cancel /
+  Save; Esc or a backdrop click closes it. Save geocodes the text, stores it, and
+  goes to the new home.
 
-- `index.html` — current Leaflet-based prototype (this IS the app right now)
-- `styles.css` — all UI styling
-- `data.js` — sample-data fixture (`window.FuelData`)
-- `services.js` — the single external-data boundary (`window.FuelServices`);
-  the one file to edit to go live with Google
-- `app.js` — UI + logic; reads external data only via `window.FuelServices`
-- `api/geocode.js`, `api/stations.js` — Vercel serverless proxy to Google
-  (Geocoding + Places `fuelOptions`); keeps the API key server-side
-- `DECISIONS.md` — this file
-- `DATA-SHAPE.md` — the exact data contract `getStationData()` must return,
-  so a live-data implementation matches what the UI already expects
+### "Stations near me" (bottom-right round button)
+Device geolocation → reverse-geocoded label → stations around you. Needs HTTPS
+(Vercel provides it) and a one-time permission. Denied → explanatory toast; the
+current view stays.
 
-## How to verify you haven't broken anything
+### Map pins
+- Each pin is a price tag: brand label (uppercase) + price for the selected grade,
+  or a dashed **N/A** tag when that station has no price for it. Tag border, stem and
+  dot use the brand color; Other is neutral grey.
+- The cheapest visible station gets a green tag and a **◆ CHEAPEST** crown.
+- The origin is shown as a **house pin ("HOME")** when it's home or the Waltham
+  seed, or a **blue teardrop** for a searched place / your location.
+- Changing grade or brands crossfades pins (~65 ms out, then a staggered fade-in).
+  `renderMarkers()` is the crossfade wrapper; `drawMarkers()` does the drawing.
 
-Open `index.html` directly in a browser (no build step, no server needed).
-Check: map renders with real street tiles, 7 pins appear, hovering a pin
-(or tapping, on touch) shows its full card including a working Navigate
-link, switching Grade/Brand crossfades the pins, the locate button
-recenters on home, and any station that's off-screen at the current
-zoom shows a directional arrow chip at the edge.
+### Pin card
+Brand logo, station name, distance from the current origin, Open/Closed (omitted
+when Google doesn't say), a freshness badge for the selected grade, all three grade
+prices (selected one highlighted, N/A where missing), and **NAVIGATE →** (opens
+Google Maps for that Place ID).
+
+**Freshness colors** (from each price's Google `updateTime`): under 12 h green,
+12–48 h amber, over 48 h red, missing grey. Ages are measured from page-load time
+(`NOW`), so they don't tick forward while the page stays open.
+
+### Off-screen / hidden station chips
+Any visible station whose pin is off-screen — **or covered by the toolbar or home
+group** — gets an arrow chip with its price at the nearest screen edge (or just
+outside the covering card). While a chip stands in for a covered pin, that pin is
+hidden. Overlapping chips are pushed apart. Clicking a chip flies to the station
+(zoom ≥ 14) and opens its card. Recomputed at most once per animation frame during
+pan/zoom, and on every filter change.
+
+## Non-obvious implementation details (read before touching)
+
+- **Hover card timing:** open after **40 ms** dwell (`HOVER_OPEN_MS`), close after
+  **80 ms** grace (`HOVER_CLOSE_MS`). Entering the card cancels the close, so the
+  cursor can travel from pin to card and click NAVIGATE. Hover is bound to the
+  visible `.ptag` chip with `mouseenter`/`mouseleave`, not Leaflet's bubbling
+  `mouseover`/`mouseout`. (Earlier versions used 130/260 ms; the anti-flicker now
+  comes from the pointer-events structure below, not long timers.)
+- **Pointer-events are load-bearing.** The popup card
+  (`.leaflet-popup-content-wrapper`) is `pointer-events:auto`; the popup tip and
+  outer box are forced `none !important` (the tip overlaps the chip and would steal
+  hover → flicker). The marker icon box is `none` too — only the price tag (and
+  crown) take the mouse, so neighbouring pins' invisible boxes don't overlap.
+  `autoPan:false` so opening a card never moves the map. Hover must not change the
+  hit target's size or position.
+- **Popup motion:** entrance fade is longer and eases out; exits are faster
+  (`pop-closing` class added on `popupclose`, removed on `popupopen`).
+- **Mobile tap → re-center:** at ≤640 px on touch, opening a card moves the map so
+  the card sits centered in the space below the toolbar. Same zoom and pin on
+  screen → `panTo` (a flat pan; `flyTo`'s zoom arc caused visible shake). Otherwise
+  → `flyTo`. Edge-chip taps on mobile do this in **one** flight (open the card first,
+  then fly) to avoid a second "forced scroll".
+- **Edge chips are positioned with CSS transforms**, created once per station and
+  reused, and only write to the DOM when something changed. Writing `left/top` every
+  frame caused layout thrash and pan/zoom lag.
+- **Arrow direction:** the arrow is rotated by `atan2(dy, dx) + 90°` from the chip's
+  final position toward the station.
+- **Framing:** after each result swap the map fits the origin + all stations,
+  padded for the toolbar (`PAD`; on mobile the top padding is measured live from
+  the toolbar), max zoom 16.
+- **Type scale:** `--fs-lg/base/sm/xs` = 18/16/14/12 px in `:root`, named after
+  Tailwind sizes. The search input is 14 px on desktop and 16 px on mobile (under
+  16 px, iOS Safari zooms on focus). Map pins stay compact on purpose (map-label
+  convention: bold price, small uppercase brand name). Change a token in the mobile
+  `@media` block rather than per element.
+
+## Running it
+
+- **The real app:** the Vercel deployment. Pushing changes = redeploying the folder
+  to that Vercel project with `GOOGLE_SERVER_KEY` set.
+- **Locally, UI only:** `Start Hope Ave Fuel.bat` (Python static server on port
+  8753) or the `gas-static` entry in `.claude/launch.json` (port 8765). Neither serves
+  `/api`, so the map loads but shows "Couldn't load live prices", and search shows
+  "Search failed: geocode http 404". Opening `index.html` directly (`file://`) behaves
+  the same way.
+- **Locally with live data:** `vercel dev` with `GOOGLE_SERVER_KEY` set. Needs Node
+  and the Vercel CLI, which are **not installed** on this machine as of 2026-11-24.
+
+### Dev self-check
+`_selfcheck.js` runs 13 measurable UI checks (overflow, contrast, tap targets, popup
+in safe area, stray map controls, 16 px mobile inputs, …). Each check is scoped to
+all / mobile / desktop widths; run it once at a desktop width and once at ≤640 px,
+each on a fresh page load:
+
+```js
+new Promise(r=>{const s=document.createElement('script');
+  s.src='/_selfcheck.js?'+Date.now(); s.onload=()=>r(window.__selfCheck());
+  document.head.appendChild(s);})
+```
+
+Add a check for each new layout bug so it can't come back.
+
+## Known limitations / open issues
+
+1. **Results capped at 20, ranked by Google's popularity, not distance.** At a large
+   radius in a busy area, closer stations can be left out without any warning.
+   Adding `rankPreference: 'DISTANCE'` to the `searchNearby` request would fix it.
+2. **Edge cache rarely hits for "near me".** The cache key is the exact lat/lng, and
+   GPS readings almost never repeat, so most "near me" lookups are paid calls.
+   Rounding coordinates (≈3 decimals) in `services.js` would fix it.
+3. **Brand is classified from the Google display name only.** A station whose
+   display name doesn't contain its brand lands in Other.
+4. **Leftovers:** `FuelServices.getHomeStations()` and `FuelData.getStationData()`
+   are unused. `--mobil` in `styles.css` is blue (used for the searched-place
+   teardrop pin), while the registry's Exxon/Mobil accent is red.
+5. **The search error hint** about `file://` only appears for network failures
+   (`TypeError`); a static server's 404 shows "Search failed: geocode http 404".
+6. **No version control** — the folder isn't a git repository.
+
+## Not done yet (optional next steps)
+
+1. **Autocomplete in the search and set-home fields** — planned and deferred; uses
+   Google Place Autocomplete via a new `api/autocomplete.js`, ZIP codes skip it.
+2. **Google basemap (optional).** Would need the Maps JavaScript API with a
+   *browser* key restricted to the site's domain, plus porting pins/cards/edge
+   chips to Advanced Markers and re-solving hover. A fresh build from the current
+   `index.html`, not a resurrection of the deleted early Google build.
+3. **Cost guardrails** — keep a budget alert set in Google Cloud Console.
+
+## How to check you haven't broken anything
+
+On the deployed site (or `vercel dev`): pins appear with prices; hover (desktop) /
+tap (touch) opens a card with a working NAVIGATE link; switching grade or brands
+crossfades pins; the cheapest pin has the crown; dragging the radius slider and
+releasing re-fetches; search moves the map and updates the location name; "near
+me" works after allowing location; setting a home enables the home chip; stations
+off-screen or under the toolbar show edge chips. Then run `_selfcheck.js` at both
+widths.
